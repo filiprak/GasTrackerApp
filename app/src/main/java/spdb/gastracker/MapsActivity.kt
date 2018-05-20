@@ -2,6 +2,9 @@ package spdb.gastracker
 
 import android.support.v7.app.AppCompatActivity
 import android.os.Bundle
+import android.util.Log
+import android.view.Menu
+import android.view.MenuItem
 
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
@@ -9,6 +12,8 @@ import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MarkerOptions
+import com.google.gson.Gson
+import spdb.gastracker.utils.DialogForm
 
 class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
@@ -21,6 +26,44 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         val mapFragment = supportFragmentManager
                 .findFragmentById(R.id.map) as SupportMapFragment
         mapFragment.getMapAsync(this)
+    }
+
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        // Inflate the menu; this adds items to the action bar if it is present.
+        menuInflater.inflate(R.menu.custom_menu, menu)
+        return true
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem) = when (item.itemId) {
+        R.id.action_settings -> {
+            // User chose the "Settings" item, show the app settings UI...
+            true
+        }
+
+        R.id.action_new_station -> {
+            // add new station
+            val form = object: DialogForm(this@MapsActivity, R.layout.station_form, "Add station", mapOf(
+                    "name" to R.id.station_name,
+                    "network" to R.id.station_network,
+                    "pb" to R.id.pb_price,
+                    "pbplus" to R.id.pbplus_price,
+                    "on" to R.id.on_price,
+                    "lpg" to R.id.lpg_price
+            )) {
+                override fun success(data: Map<String, Any>) {
+                    Log.i("gastracker", Gson().toJson(data));
+                }
+            }
+
+            form.open(null)
+            true
+        }
+
+        else -> {
+            // If we got here, the user's action was not recognized.
+            // Invoke the superclass to handle it.
+            super.onOptionsItemSelected(item)
+        }
     }
 
     /**

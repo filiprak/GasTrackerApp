@@ -1,0 +1,16 @@
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <item
+        android:id="@+id/action_new_station"
+        android:icon="@drawable/add_location"
+        android:title="@string/new_station"
+        app:showAsAction="ifRoom"/>
+
+    <!-- Settings, should always be in the overflow -->
+    <item android:id="@+id/action_settings"
+        android:title="@string/action_settings"
+        app:showAsAction="never"/>
+
+
+</menu>
