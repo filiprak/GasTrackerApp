@@ -16,4 +16,5 @@
     <string name="title_activity_maps">GoogleMap</string>
     <string name="action_settings">Menu</string>
     <string name="new_station">Add station</string>
+    <string name="point_symbol">.</string>
 </resources>

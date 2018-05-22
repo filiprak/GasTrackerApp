@@ -12,26 +12,7 @@
         <LinearLayout
             android:layout_width="fill_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal">
-
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="0.25"
-                android:padding="5dp"
-                android:text="Name" />
-
-            <EditText
-                android:id="@+id/station_name"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="0.75"
-                android:ems="10" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="fill_parent"
-            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
             android:orientation="horizontal">
 
             <TextView
@@ -41,12 +22,14 @@
                 android:padding="5dp"
                 android:text="Network" />
 
-            <EditText
+            <com.toptoche.searchablespinnerlibrary.SearchableSpinner
                 android:id="@+id/station_network"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="70dp"
                 android:layout_weight="0.75"
-                android:ems="10" />
+                android:layoutMode="clipBounds"
+                android:spinnerMode="dialog" />
+
         </LinearLayout>
 
         <LinearLayout
@@ -57,39 +40,19 @@
             <CheckBox
                 android:id="@+id/pb_checkBox"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="match_parent"
                 android:layout_weight="0.25"
-                android:text="PB" />
+                android:text="PB95" />
 
-            <EditText
+            <spdb.gastracker.widgets.PricePicker
                 android:id="@+id/pb_price"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="120dp"
                 android:layout_weight="0.75"
-                android:ems="10"
-                android:inputType="numberDecimal" />
-
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:orientation="horizontal">
-
-            <CheckBox
-                android:id="@+id/pbplus_checkBox"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="0.25"
-                android:text="PB+" />
-
-            <EditText
-                android:id="@+id/pbplus_price"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="0.75"
-                android:ems="10"
-                android:inputType="numberDecimal" />
+                android:clipChildren="false"
+                android:clipToPadding="false"
+                android:paddingBottom="10dp"
+                android:paddingTop="10dp" />
 
         </LinearLayout>
 
@@ -101,17 +64,17 @@
             <CheckBox
                 android:id="@+id/on_checkBox"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="match_parent"
                 android:layout_weight="0.25"
                 android:text="ON" />
 
-            <EditText
+            <spdb.gastracker.widgets.PricePicker
                 android:id="@+id/on_price"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="120dp"
                 android:layout_weight="0.75"
-                android:ems="10"
-                android:inputType="numberDecimal" />
+                android:paddingBottom="10dp"
+                android:paddingTop="10dp" />
 
         </LinearLayout>
 
@@ -123,17 +86,17 @@
             <CheckBox
                 android:id="@+id/lpg_checkBox"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="match_parent"
                 android:layout_weight="0.25"
                 android:text="LPG" />
 
-            <EditText
+            <spdb.gastracker.widgets.PricePicker
                 android:id="@+id/lpg_price"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="120dp"
                 android:layout_weight="0.75"
-                android:ems="10"
-                android:inputType="numberDecimal" />
+                android:paddingBottom="10dp"
+                android:paddingTop="10dp" />
 
         </LinearLayout>
 
