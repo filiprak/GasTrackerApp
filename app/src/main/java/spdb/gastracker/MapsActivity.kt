@@ -9,7 +9,6 @@ import android.view.MenuItem
 import android.view.View
 import android.widget.ArrayAdapter
 import android.widget.CheckBox
-import android.widget.NumberPicker
 import android.widget.Spinner
 
 import com.google.android.gms.maps.CameraUpdateFactory
@@ -19,9 +18,10 @@ import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MarkerOptions
 import com.google.gson.Gson
-import org.json.JSONArray
 import spdb.gastracker.utils.DialogForm
 import spdb.gastracker.widgets.PricePicker
+import com.google.android.gms.maps.model.LatLngBounds
+import spdb.gastracker.widgets.StationInfoWindowAdapter
 
 
 class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
@@ -44,7 +44,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
         // init form
         form = object: DialogForm(this@MapsActivity, R.layout.station_form, "Add station", mapOf(
-                "network" to R.id.station_network,
+                "network_id" to R.id.station_network,
                 "PB95" to R.id.pb_price,
                 "ON" to R.id.on_price,
                 "LPG" to R.id.lpg_price,
@@ -122,11 +122,6 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         R.id.action_new_station -> {
             // add new station
             form.open(null)
-            rest.getNetworks({
-                data -> Log.i("gastracker", "${data}")
-            }, {
-                error -> Log.e("gastracker", "${error}")
-            })
             true
         }
 
@@ -140,8 +135,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
     /**
      * Manipulates the map once available.
      * This callback is triggered when the map is ready to be used.
-     * This is where we can add markers or lines, add listeners or move the camera. In this case,
-     * we just add a marker near Sydney, Australia.
+     * This is where we can add markers or lines, add listeners or move the camera.
      * If Google Play services is not installed on the device, the user will be prompted to install
      * it inside the SupportMapFragment. This method will only be triggered once the user has
      * installed Google Play services and returned to the app.
@@ -149,9 +143,27 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
     override fun onMapReady(googleMap: GoogleMap) {
         mMap = googleMap
 
-        // Add a marker in Sydney and move the camera
-        val sydney = LatLng(-34.0, 151.0)
-        mMap.addMarker(MarkerOptions().position(sydney).title("Marker in Sydney"))
-        mMap.moveCamera(CameraUpdateFactory.newLatLng(sydney))
+        mMap.setInfoWindowAdapter(StationInfoWindowAdapter(this@MapsActivity))
+
+        val llbuilder = LatLngBounds.Builder()
+
+        val sampleStations = 1..10
+        for (id in sampleStations) {
+            rest.getStation(id.toLong(), { data ->
+                if (data != null) {
+                    val json = data.obj()
+                    val coords = LatLng(json["lat"] as Double, json["lng"] as Double)
+                    val station_id = json["station_id"] as Int
+                    val network_id = json["network_id"] as Int
+                    val nname = gasNetworks.get(network_id)
+
+                    llbuilder.include(coords)
+                    val m = mMap.addMarker(MarkerOptions().position(coords))
+                    m.tag = json
+                    mMap.animateCamera(CameraUpdateFactory.newLatLngBounds(llbuilder.build(), 100))
+                }
+            }, {})
+        }
+
     }
 }
