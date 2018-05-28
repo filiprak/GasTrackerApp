@@ -12,5 +12,8 @@
         android:title="@string/action_settings"
         app:showAsAction="never"/>
 
+    <item android:id="@+id/action_latlng"
+        android:title="@string/action_latlng"
+        app:showAsAction="never"/>
 
 </menu>

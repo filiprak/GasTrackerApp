@@ -1,6 +1,8 @@
 package spdb.gastracker
 
 import android.app.AlertDialog
+import android.content.Context
+import android.location.LocationManager
 import android.support.v7.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
@@ -10,6 +12,7 @@ import android.view.View
 import android.widget.ArrayAdapter
 import android.widget.CheckBox
 import android.widget.Spinner
+import android.widget.Toast
 
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
@@ -21,12 +24,16 @@ import com.google.gson.Gson
 import spdb.gastracker.utils.DialogForm
 import spdb.gastracker.widgets.PricePicker
 import com.google.android.gms.maps.model.LatLngBounds
+import com.google.android.gms.maps.model.Marker
+import org.json.JSONObject
 import spdb.gastracker.widgets.StationInfoWindowAdapter
 
 
 class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
     private lateinit var mMap: GoogleMap
+    private lateinit var locManager: LocationManager
+
     private lateinit var form: DialogForm
 
     private var gasNetworks: HashMap<Int, GasNetwork> = hashMapOf()
@@ -42,8 +49,10 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                 .findFragmentById(R.id.map) as SupportMapFragment
         mapFragment.getMapAsync(this)
 
+        locManager = this.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+
         // init form
-        form = object: DialogForm(this@MapsActivity, R.layout.station_form, "Add station", mapOf(
+        form = object: DialogForm(this@MapsActivity, R.layout.station_form, "Gas station", mapOf(
                 "network_id" to R.id.station_network,
                 "PB95" to R.id.pb_price,
                 "ON" to R.id.on_price,
@@ -114,8 +123,24 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
     }
 
     override fun onOptionsItemSelected(item: MenuItem) = when (item.itemId) {
-        R.id.action_settings -> {
+        R.id.action_latlng -> {
             // User chose the "Settings" item, show the app settings UI...
+            try {
+                val loc = locManager.getLastKnownLocation(LocationManager.PASSIVE_PROVIDER)
+                val msg = if(loc == null) "none" else "${loc.latitude}, ${loc.longitude}"
+                Toast.makeText(this@MapsActivity,
+                        msg,
+                        Toast.LENGTH_LONG).show()
+            } catch (e: SecurityException) {
+                Toast.makeText(this@MapsActivity,
+                        e.message,
+                        Toast.LENGTH_SHORT).show()
+            }
+            true
+        }
+
+        R.id.action_settings -> {
+
             true
         }
 
@@ -143,7 +168,34 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
     override fun onMapReady(googleMap: GoogleMap) {
         mMap = googleMap
 
+        try {
+            mMap.setMyLocationEnabled(true)
+
+        } catch (e: SecurityException) {
+            Toast.makeText(this@MapsActivity, e.message, Toast.LENGTH_SHORT).show()
+        }
+
         mMap.setInfoWindowAdapter(StationInfoWindowAdapter(this@MapsActivity))
+        mMap.setOnInfoWindowClickListener { marker: Marker? ->
+            if (marker != null) {
+                val mData: JSONObject = marker.tag as JSONObject
+                val mPrice: JSONObject = mData["price"] as JSONObject
+
+                Log.i("gastracker", mData.toString())
+
+                val mapData = HashMap<String, Any>()
+                mapData["network_id"] = mData["network_id"]
+                mapData["hasPB95"] = mPrice.get("PB95") != null
+                mapData["hasON"] = mPrice.get("ON") != null
+                mapData["hasLPG"] = mPrice.get("LPG") != null
+
+                mapData["PB95"] = mPrice.getDouble("PB95")
+                mapData["ON"] = mPrice.getDouble("ON")
+                mapData["LPG"] = mPrice.getDouble("LPG")
+
+                form.open(mapData)
+            }
+        }
 
         val llbuilder = LatLngBounds.Builder()
 

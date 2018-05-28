@@ -40,8 +40,8 @@ class PricePicker @JvmOverloads constructor(
     }
 
     fun setPrice(price: Float) {
-        var sm = price.toInt()
-        var big = ((price - sm) * 100.0f).toInt()
+        var big = price.toInt()
+        var sm = ((price - big) * 100.0f).toInt()
 
         if (big > bigPrice.maxValue) big = bigPrice.maxValue
         if (big < bigPrice.minValue) big = bigPrice.minValue

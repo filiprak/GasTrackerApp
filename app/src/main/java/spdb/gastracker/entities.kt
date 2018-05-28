@@ -1,5 +1,7 @@
 package spdb.gastracker
 
+import com.google.gson.annotations.SerializedName
+
 
 class GasNetwork(id: Int, name: String) {
     val network_id: Int

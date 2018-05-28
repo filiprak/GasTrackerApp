@@ -45,7 +45,14 @@ open class DialogForm(context: Context, layout: Int, title: String, schema: Map<
                 } else if (cview is NumberPicker) {
                     (cview as NumberPicker).value = value as Int
                 } else if (cview is PricePicker) {
-                    (cview as PricePicker).setPrice(value as Float)
+                    if (value is Double)
+                        (cview as PricePicker).setPrice((value as Double).toFloat())
+                    else if (value is Float)
+                        (cview as PricePicker).setPrice(value as Float)
+                    else if(value is Int)
+                        (cview as PricePicker).setPrice((value as Int).toFloat())
+                    else
+                        (cview as PricePicker).setPrice((value as Number).toFloat())
                 } else if (cview is Spinner) {
                     val spinner = (cview as Spinner)
                     for (i in 0..(spinner.count - 1)) {
