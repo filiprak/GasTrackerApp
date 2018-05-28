@@ -66,6 +66,26 @@ class RestApi() {
         })
     }
 
+    /** GET /clusters?bounding=(Polygon | Circle) */
+    fun getClusters(id: Long? = null, bounding: String? = "Polygon", resolve: (data: Json?) -> Any, error: (error: FuelError) -> Any) {
+        (if (id != null) "/clusters/${id}" else "/clusters").httpGet(
+            if(bounding != null) listOf("bounding" to bounding) else listOf()
+
+        ).responseJson({ request, response, result ->
+            val (data, err) = result
+
+            if (err == null) {
+                // success
+                Log.i("gastracker", "RestApi.getClusters(OK): ${data.toString()}")
+                resolve(data)
+            } else {
+                // error
+                Log.e("gastracker", "RestApi.getClusters(ERR): ${err}")
+                error(err)
+            }
+        })
+    }
+
     init {
         FuelManager.instance.basePath = serverBaseUrl
     }

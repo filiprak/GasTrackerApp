@@ -15,11 +15,11 @@ class StationInfoWindowAdapter(context: Context) : GoogleMap.InfoWindowAdapter {
     val ctx: Context
 
 
-    override fun getInfoContents(p0: Marker?): View {
+    override fun getInfoContents(p0: Marker?): View? {
         val view = (ctx as Activity).layoutInflater
                 .inflate(R.layout.station_info_window, null)
 
-        val mData = if(p0 != null) p0.tag as JSONObject else null
+        val mData = if(p0 != null && p0.tag is JSONObject) p0.tag as JSONObject else null
         if (mData != null) {
             val nname = mData["network_name"] as String
             val nid = mData["station_id"] as Int
@@ -28,8 +28,9 @@ class StationInfoWindowAdapter(context: Context) : GoogleMap.InfoWindowAdapter {
             view.findViewById<TextView>(R.id.pb_price).text = "%.2f PLN".format(price["PB95"])
             view.findViewById<TextView>(R.id.on_price).text = "%.2f PLN".format(price["ON"])
             view.findViewById<TextView>(R.id.lpg_price).text = "%.2f PLN".format(price["LPG"])
+            return view
         }
-        return view
+        return null
     }
 
     override fun getInfoWindow(p0: Marker?): View? {

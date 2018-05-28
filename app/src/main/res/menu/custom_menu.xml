@@ -16,4 +16,10 @@
         android:title="@string/action_latlng"
         app:showAsAction="never"/>
 
+    <item
+        android:id="@+id/action_clusters"
+        android:checkable="true"
+        android:checked="false"
+        android:title="@string/action_clusters" />
+
 </menu>

@@ -2,9 +2,12 @@ package spdb.gastracker
 
 import android.app.AlertDialog
 import android.content.Context
+import android.graphics.Color
 import android.location.LocationManager
 import android.support.v7.app.AppCompatActivity
 import android.os.Bundle
+import android.support.design.widget.Snackbar
+import android.support.v4.content.res.ResourcesCompat
 import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
@@ -17,6 +20,8 @@ import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.*
 import com.google.gson.Gson
+import org.json.JSONArray
+import org.json.JSONException
 import spdb.gastracker.utils.DialogForm
 import spdb.gastracker.widgets.PricePicker
 import org.json.JSONObject
@@ -27,12 +32,18 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
     private lateinit var mMap: GoogleMap
     private lateinit var locManager: LocationManager
+    private var mOptionsMenu: Menu? = null
 
     private lateinit var form: DialogForm
 
     private var gasNetworks: HashMap<Int, GasNetwork> = hashMapOf()
 
     private lateinit var rest: RestApi
+
+    // map data cache
+    private var stationMarkers: MutableList<Marker> = mutableListOf<Marker>()
+    private var clusterPolygons: MutableList<Polygon> = mutableListOf<Polygon>()
+    private var cluster_centerMarkers: MutableList<Marker> = mutableListOf<Marker>()
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -110,14 +121,17 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                 netw_spinner.adapter = adapter
             }
             this@MapsActivity.loader("off")
-        }, { this@MapsActivity.loader("off") })
+        }, { e-> this@MapsActivity.loader("off"); errorSnackbar(e.message) })
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         // Inflate the menu; this adds items to the action bar if it is present.
         menuInflater.inflate(R.menu.custom_menu, menu)
+        mOptionsMenu = menu
         return true
     }
+
+
 
     override fun onOptionsItemSelected(item: MenuItem) = when (item.itemId) {
         R.id.action_latlng -> {
@@ -132,6 +146,18 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                 Toast.makeText(this@MapsActivity,
                         e.message,
                         Toast.LENGTH_SHORT).show()
+            }
+            true
+        }
+
+        R.id.action_clusters -> {
+            if (!item.isChecked) {
+                showClusters()
+                item.setChecked(true)
+            }
+            else if (item.isChecked) {
+                clearClusters()
+                item.setChecked(false)
             }
             true
         }
@@ -175,22 +201,24 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         mMap.setInfoWindowAdapter(StationInfoWindowAdapter(this@MapsActivity))
         mMap.setOnInfoWindowClickListener { marker: Marker? ->
             if (marker != null) {
-                val mData: JSONObject = marker.tag as JSONObject
-                val mPrice: JSONObject = mData["price"] as JSONObject
+                try {
+                    val mData: JSONObject = marker.tag as JSONObject
+                    val mPrice: JSONObject = mData["price"] as JSONObject
 
-                Log.i("gastracker", mData.toString())
+                    Log.i("gastracker", mData.toString())
 
-                val mapData = HashMap<String, Any>()
-                mapData["network_id"] = mData["network_id"]
-                mapData["hasPB95"] = mPrice.get("PB95") != null
-                mapData["hasON"] = mPrice.get("ON") != null
-                mapData["hasLPG"] = mPrice.get("LPG") != null
+                    val mapData = HashMap<String, Any>()
+                    mapData["network_id"] = mData["network_id"]
+                    mapData["hasPB95"] = mPrice.get("PB95") != null
+                    mapData["hasON"] = mPrice.get("ON") != null
+                    mapData["hasLPG"] = mPrice.get("LPG") != null
 
-                mapData["PB95"] = mPrice.getDouble("PB95")
-                mapData["ON"] = mPrice.getDouble("ON")
-                mapData["LPG"] = mPrice.getDouble("LPG")
+                    mapData["PB95"] = mPrice.getDouble("PB95")
+                    mapData["ON"] = mPrice.getDouble("ON")
+                    mapData["LPG"] = mPrice.getDouble("LPG")
 
-                form.open(mapData)
+                    form.open(mapData)
+                } catch (e: Exception) { Log.w("gastracker", e.message) }
             }
         }
 
@@ -199,7 +227,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         try {
             loader("on")
             val loc = locManager.getLastKnownLocation(LocationManager.PASSIVE_PROVIDER)
-            rest.getStationsFromRadius(10000.0, LatLng(loc.latitude, loc.longitude), { data ->
+            rest.getStationsFromRadius(15000.0, LatLng(loc.latitude, loc.longitude), { data ->
                 if (data != null) {
                     val stations = data.array()
                     for (i in 0..(stations.length() - 1)) {
@@ -213,11 +241,12 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                         val m = mMap.addMarker(MarkerOptions().position(coords))
                         m.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.marker))
                         m.tag = station
+                        stationMarkers.add(m)
                     }
                     mMap.animateCamera(CameraUpdateFactory.newLatLngBounds(llbuilder.build(), 100))
                 }
                 this@MapsActivity.loader("off")
-            }, { this@MapsActivity.loader("off") })
+            }, { e-> this@MapsActivity.loader("off"); errorSnackbar(e.message) })
 
         } catch (e: SecurityException) {
             Toast.makeText(this@MapsActivity,
@@ -225,6 +254,65 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                     Toast.LENGTH_SHORT).show()
         }
 
+        if (mOptionsMenu != null && mOptionsMenu!!.findItem(R.id.action_clusters).isChecked)
+            showClusters()
+        else clearClusters()
+    }
+
+    fun showClusters(type: String = "Polygon") {
+        loader("on")
+        rest.getClusters(bounding = type, resolve = {data ->
+            if (data != null) {
+                val llbuilder = LatLngBounds.Builder()
+                val clusters = data.array()
+
+                for (i in 0..(clusters.length() - 1)) {
+                    val cluster = clusters.getJSONObject(i)
+                    val coords = LatLng(cluster["lat"] as Double, cluster["lng"] as Double)
+                    val bounding = cluster["bounding"] as JSONObject
+                    val bcoordinates = bounding["coordinates"] as JSONArray
+                    val btype = bounding["type"] as String
+                    val bcoordsarray = (if(btype == "Polygon") {
+                        bcoordinates.getJSONArray(0)
+                    } else if (btype == "LineString") {
+                        bcoordinates
+                    } else if (btype == "Point") {
+                        JSONArray().put(bcoordinates)
+                    } else JSONArray())
+
+                    val cluster_id = cluster["cluster_id"] as Int
+
+                    llbuilder.include(coords)
+                    val popts = PolygonOptions()
+                            .fillColor(ResourcesCompat.getColor(getResources(), R.color.clusterFill, null))
+                            .strokeColor(ResourcesCompat.getColor(getResources(), R.color.clusterBound, null))
+                            .strokeWidth(3.0f)
+
+                    for (i in 0..(bcoordsarray.length() - 1)) {
+                        val pcoords = bcoordsarray.getJSONArray(i)
+                        val latlng = LatLng(pcoords.getDouble(0), pcoords.getDouble(1))
+                        popts.add(latlng)
+                    }
+                    val p = mMap.addPolygon(popts)
+                    clusterPolygons.add(p)
+                    val m = mMap.addMarker(MarkerOptions().position(coords))
+                    cluster_centerMarkers.add(m)
+                    m.setAnchor(0.5f, 0.5f)
+                    m.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.target_red))
+                    p.tag = cluster
+                }
+                mMap.animateCamera(CameraUpdateFactory.newLatLngBounds(llbuilder.build(), 100))
+            }
+            this@MapsActivity.loader("off")
+        }, error = {e ->
+            this@MapsActivity.loader("off")
+            errorSnackbar(e.message)
+        })
+    }
+
+    fun clearClusters() {
+        clusterPolygons.forEach { polygon: Polygon -> polygon.remove() }
+        cluster_centerMarkers.forEach { marker: Marker -> marker.remove() }
     }
 
     private var pendingLoader = 0
@@ -242,5 +330,45 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             pendingLoader -= 1
         }
         Log.i("gastracker_loader", "Toggle loader(${cmd}) [${pendingLoader}]: thread: ${Thread.currentThread()}")
+    }
+
+
+    fun errorSnackbar(message: String?) {
+
+        val snackbar = Snackbar.make(
+                findViewById(android.R.id.content),
+                if (!(message is String)) "Unknown error" else message,
+                Snackbar.LENGTH_INDEFINITE
+        )
+
+        // Get the snack bar root view
+        val snack_root_view = snackbar.view
+
+        // Get the snack bar text view
+        val snack_text_view = snack_root_view
+                .findViewById<TextView>(android.support.design.R.id.snackbar_text)
+        snack_text_view.maxLines = 10
+
+        // Get the snack bar action view
+        val snack_action_view = snack_root_view
+                .findViewById<Button>(android.support.design.R.id.snackbar_action)
+
+        // Change the snack bar root view background color
+        snack_root_view.setBackgroundColor(ResourcesCompat.getColor(getResources(), R.color.errorSnackbarColor, null))
+
+        // Change the snack bar text view text color
+        snack_text_view.setTextColor(Color.WHITE)
+
+        // Change the snack bar action button text color
+        snack_action_view.setTextColor(Color.WHITE)
+
+        // Set an action for snack bar
+        snackbar.setAction("Hide",{
+            // Hide the snack bar
+            snackbar.dismiss()
+        })
+
+        // Finally, display the snack bar
+        snackbar.show()
     }
 }

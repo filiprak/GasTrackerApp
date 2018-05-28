@@ -18,4 +18,5 @@
     <string name="action_latlng">Show LatLng</string>
     <string name="new_station">Add station</string>
     <string name="point_symbol">.</string>
+    <string name="action_clusters">Show clusters</string>
 </resources>
