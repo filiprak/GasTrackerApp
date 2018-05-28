@@ -9,10 +9,7 @@ import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
-import android.widget.ArrayAdapter
-import android.widget.CheckBox
-import android.widget.Spinner
-import android.widget.Toast
+import android.widget.*
 
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
@@ -48,6 +45,8 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         val mapFragment = supportFragmentManager
                 .findFragmentById(R.id.map) as SupportMapFragment
         mapFragment.getMapAsync(this)
+
+        loader("on")
 
         locManager = this.getSystemService(Context.LOCATION_SERVICE) as LocationManager
 
@@ -113,7 +112,8 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                 }
                 netw_spinner.adapter = adapter
             }
-        }, {})
+            this@MapsActivity.loader("off")
+        }, { this@MapsActivity.loader("off") })
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -217,5 +217,17 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             }, {})
         }
 
+    }
+
+
+    fun loader(cmd: String) {
+        if (cmd == "on") {
+            this.findViewById<FrameLayout>(R.id.map_layer).alpha = 0.25f
+            this.findViewById<ProgressBar>(R.id.loader).visibility = View.VISIBLE
+
+        } else if (cmd == "off") {
+            this.findViewById<FrameLayout>(R.id.map_layer).alpha = 1.0f
+            this.findViewById<ProgressBar>(R.id.loader).visibility = View.INVISIBLE
+        }
     }
 }
