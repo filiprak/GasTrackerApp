@@ -15,13 +15,10 @@ import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
-import com.google.android.gms.maps.model.LatLng
-import com.google.android.gms.maps.model.MarkerOptions
+import com.google.android.gms.maps.model.*
 import com.google.gson.Gson
 import spdb.gastracker.utils.DialogForm
 import spdb.gastracker.widgets.PricePicker
-import com.google.android.gms.maps.model.LatLngBounds
-import com.google.android.gms.maps.model.Marker
 import org.json.JSONObject
 import spdb.gastracker.widgets.StationInfoWindowAdapter
 
@@ -199,35 +196,51 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
         val llbuilder = LatLngBounds.Builder()
 
-        val sampleStations = 1..10
-        for (id in sampleStations) {
-            rest.getStation(id.toLong(), { data ->
+        try {
+            loader("on")
+            val loc = locManager.getLastKnownLocation(LocationManager.PASSIVE_PROVIDER)
+            rest.getStationsFromRadius(10000.0, LatLng(loc.latitude, loc.longitude), { data ->
                 if (data != null) {
-                    val json = data.obj()
-                    val coords = LatLng(json["lat"] as Double, json["lng"] as Double)
-                    val station_id = json["station_id"] as Int
-                    val network_id = json["network_id"] as Int
-                    val nname = gasNetworks.get(network_id)
+                    val stations = data.array()
+                    for (i in 0..(stations.length() - 1)) {
+                        val station = stations.getJSONObject(i)
+                        val coords = LatLng(station["lat"] as Double, station["lng"] as Double)
+                        val station_id = station["station_id"] as Int
+                        val network_id = station["network_id"] as Int
+                        val nname = gasNetworks.get(network_id)
 
-                    llbuilder.include(coords)
-                    val m = mMap.addMarker(MarkerOptions().position(coords))
-                    m.tag = json
+                        llbuilder.include(coords)
+                        val m = mMap.addMarker(MarkerOptions().position(coords))
+                        m.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.marker))
+                        m.tag = station
+                    }
                     mMap.animateCamera(CameraUpdateFactory.newLatLngBounds(llbuilder.build(), 100))
                 }
-            }, {})
+                this@MapsActivity.loader("off")
+            }, { this@MapsActivity.loader("off") })
+
+        } catch (e: SecurityException) {
+            Toast.makeText(this@MapsActivity,
+                    e.message,
+                    Toast.LENGTH_SHORT).show()
         }
 
     }
 
-
-    fun loader(cmd: String) {
+    private var pendingLoader = 0
+    @Synchronized fun loader(cmd: String) {
         if (cmd == "on") {
             this.findViewById<FrameLayout>(R.id.map_layer).alpha = 0.25f
             this.findViewById<ProgressBar>(R.id.loader).visibility = View.VISIBLE
+            pendingLoader += 1
 
         } else if (cmd == "off") {
-            this.findViewById<FrameLayout>(R.id.map_layer).alpha = 1.0f
-            this.findViewById<ProgressBar>(R.id.loader).visibility = View.INVISIBLE
+            if (pendingLoader < 2) {
+                this.findViewById<FrameLayout>(R.id.map_layer).alpha = 1.0f
+                this.findViewById<ProgressBar>(R.id.loader).visibility = View.INVISIBLE
+            }
+            pendingLoader -= 1
         }
+        Log.i("gastracker_loader", "Toggle loader(${cmd}) [${pendingLoader}]: thread: ${Thread.currentThread()}")
     }
 }
