@@ -9,4 +9,5 @@
     <color name="clusterBound">#c9184393</color>
 
     <color name="errorSnackbarColor">#ebff1b1f</color>
+    <color name="routeLine">#d3b91bac</color>
 </resources>

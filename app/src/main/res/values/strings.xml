@@ -19,4 +19,6 @@
     <string name="new_station">Add station</string>
     <string name="point_symbol">.</string>
     <string name="action_clusters">Show clusters</string>
+    <string name="action_route">New route</string>
+    <string name="action_clear">Clear map</string>
 </resources>

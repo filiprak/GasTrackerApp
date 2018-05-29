@@ -17,9 +17,19 @@
         app:showAsAction="never"/>
 
     <item
+        android:id="@+id/action_route"
+        android:title="@string/action_route"
+        app:showAsAction="never"/>
+
+    <item
         android:id="@+id/action_clusters"
         android:checkable="true"
         android:checked="false"
         android:title="@string/action_clusters" />
+
+    <item
+        android:id="@+id/action_clear"
+        android:title="@string/action_clear"
+        app:showAsAction="never"/>
 
 </menu>

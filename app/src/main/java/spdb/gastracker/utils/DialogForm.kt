@@ -13,6 +13,7 @@ import com.google.gson.Gson
 import spdb.gastracker.widgets.PricePicker
 import android.view.ViewGroup
 import android.widget.Spinner
+import com.google.android.gms.location.places.ui.PlaceAutocompleteFragment
 
 
 open class DialogForm(context: Context, layout: Int, title: String, schema: Map<String, Int>) {
@@ -61,6 +62,8 @@ open class DialogForm(context: Context, layout: Int, title: String, schema: Map<
                             break
                         }
                     }
+                } else if (cview is PlaceAutocompleteFragment) {
+                    (cview as PlaceAutocompleteFragment)
                 }
             }
         }
