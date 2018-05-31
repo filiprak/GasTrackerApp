@@ -9,22 +9,23 @@ import com.github.kittinunf.fuel.httpGet
 import com.google.android.gms.maps.model.LatLng
 
 
-class RestApi() {
+class RestApi {
 
     val serverBaseUrl = "https://gas-tracker-app.herokuapp.com"
 
     /** GET all networks*/
     fun getNetworks(resolve: (data: Json?) -> Any, error: (error: FuelError) -> Any) {
+        Log.i("restApi", "pobieram stacje")
         "/networks".httpGet().responseJson({ request, response, result ->
             val (data, err) = result
 
             if (err == null) {
                 // success
-                Log.i("gastracker", "RestApi.getNetworks(OK): ${data.toString()}")
+                Log.i("restApi", "RestApi.getNetworks(OK): ${data.toString()}")
                 resolve(data)
             } else {
                 // error
-                Log.e("gastracker", "RestApi.getNetworks(ERR): ${err}")
+                Log.e("restApi", "RestApi.getNetworks(ERR): ${err}")
                 error(err)
             }
         })

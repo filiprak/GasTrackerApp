@@ -1,12 +1,14 @@
 package spdb.gastracker
 
+import android.annotation.SuppressLint
 import android.app.AlertDialog
-import android.content.Context
+import android.content.pm.PackageManager
 import android.graphics.Color
-import android.location.LocationManager
+import android.location.Location
 import android.support.v7.app.AppCompatActivity
 import android.os.Bundle
 import android.support.design.widget.Snackbar
+import android.support.v4.app.ActivityCompat
 import android.support.v4.content.res.ResourcesCompat
 import android.util.Log
 import android.view.Menu
@@ -14,6 +16,8 @@ import android.view.MenuItem
 import android.view.View
 import android.widget.*
 import com.google.android.gms.common.api.Status
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.places.Place
 import com.google.android.gms.location.places.ui.PlaceAutocompleteFragment
 import com.google.android.gms.location.places.ui.PlaceSelectionListener
@@ -38,7 +42,9 @@ import spdb.gastracker.widgets.StationInfoWindowAdapter
 class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
     private lateinit var mMap: GoogleMap
-    private lateinit var locManager: LocationManager
+    private lateinit var fusedLocationClient: FusedLocationProviderClient
+    var lastLocation = Location("kappa")
+
     private var mOptionsMenu: Menu? = null
 
     private lateinit var form: DialogForm
@@ -60,6 +66,8 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
     private var routeMarkers: MutableList<Marker> = mutableListOf<Marker>()
     private var routePolyline: MutableList<Polyline> = mutableListOf<Polyline>()
 
+    private val permissions = arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION, android.Manifest.permission.INTERNET)
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -70,11 +78,13 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         mapFragment.getMapAsync(this)
 
         loader("on")
+        Log.i("onCreate", "Odpala sie")
+        lastLocation.latitude = 52.23
+        lastLocation.longitude = 21.01
 
-        locManager = this.getSystemService(Context.LOCATION_SERVICE) as LocationManager
 
         // init form
-        form = object: DialogForm(this@MapsActivity, R.layout.station_form, "Gas station", mapOf(
+        form = object : DialogForm(this@MapsActivity, R.layout.station_form, "Gas station", mapOf(
                 "network_id" to R.id.station_network,
                 "PB95" to R.id.pb_price,
                 "ON" to R.id.on_price,
@@ -85,12 +95,13 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                 "hasLPG" to R.id.lpg_checkBox
         )) {
             override fun success(data: Map<String, Any>) {
-                Log.i("gastracker", Gson().toJson(data));
+                Log.i("gastracker", Gson().toJson(data))
             }
+
             override fun initialise(builder: AlertDialog.Builder, view: View, schema: Map<String, Int>) {
                 val pb_control = view.findViewById<PricePicker>(R.id.pb_price)
-                val on_control = view.findViewById<PricePicker>(R.id.on_price);
-                val lpg_control = view.findViewById<PricePicker>(R.id.lpg_price);
+                val on_control = view.findViewById<PricePicker>(R.id.on_price)
+                val lpg_control = view.findViewById<PricePicker>(R.id.lpg_price)
 
                 pb_control.isEnabled = false
                 on_control.isEnabled = false
@@ -99,11 +110,11 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                 view.findViewById<CheckBox>(R.id.pb_checkBox).setOnCheckedChangeListener({ compoundButton, b ->
                     pb_control.isEnabled = b
                 })
-                view.findViewById<CheckBox>(R.id.on_checkBox).setOnCheckedChangeListener({
-                    compoundButton, b -> on_control.isEnabled = b
+                view.findViewById<CheckBox>(R.id.on_checkBox).setOnCheckedChangeListener({ compoundButton, b ->
+                    on_control.isEnabled = b
                 })
-                view.findViewById<CheckBox>(R.id.lpg_checkBox).setOnCheckedChangeListener({
-                    compoundButton, b -> lpg_control.isEnabled = b
+                view.findViewById<CheckBox>(R.id.lpg_checkBox).setOnCheckedChangeListener({ compoundButton, b ->
+                    lpg_control.isEnabled = b
                 })
 
                 // add networks
@@ -112,7 +123,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             }
         }
         // route form
-        routeForm = object: DialogForm(this@MapsActivity, R.layout.route_form, "New route", mapOf()) {
+        routeForm = object : DialogForm(this@MapsActivity, R.layout.route_form, "New route", mapOf()) {
             override fun success(data: Map<String, Any>) {
                 if (routeOrigin == null || routeDest == null) {
                     errorSnackbar("Please enter route origin and destination")
@@ -140,10 +151,12 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                                         drawRoute(result)
                                         val llbuilder = LatLngBounds.Builder()
                                         var empty = true
-                                        routePolyline.forEach { polyline: Polyline -> polyline.points.forEach {
-                                            latLng: LatLng? -> if(latLng != null) llbuilder.include(latLng)
-                                            empty = false
-                                        } }
+                                        routePolyline.forEach { polyline: Polyline ->
+                                            polyline.points.forEach { latLng: LatLng? ->
+                                                if (latLng != null) llbuilder.include(latLng)
+                                                empty = false
+                                            }
+                                        }
                                         if (!empty)
                                             mMap.animateCamera(CameraUpdateFactory.newLatLngBounds(llbuilder.build(), 100))
                                         this@MapsActivity.loader("off")
@@ -200,7 +213,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                 }
 
                 val netw_spinner = form.dialogView.findViewById<Spinner>(R.id.station_network)
-                val adapter = object: ArrayAdapter<GasNetwork>(this@MapsActivity, R.layout.spinner_item,
+                val adapter = object : ArrayAdapter<GasNetwork>(this@MapsActivity, R.layout.spinner_item,
                         gasNetworks.values.toList()) {
                     override fun getItemId(position: Int): Long {
                         return (getItem(position).network_id).toLong()
@@ -209,7 +222,13 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                 netw_spinner.adapter = adapter
             }
             this@MapsActivity.loader("off")
-        }, { e-> this@MapsActivity.loader("off"); errorSnackbar(e.message) })
+        }, { e ->
+            Log.e("restApi", "getNetworksError: " + e.message)
+            this@MapsActivity.loader("off"); errorSnackbar(e.message)
+        })
+
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
+
     }
 
     private fun createGeoApiContext(): GeoApiContext {
@@ -226,16 +245,16 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
     }
 
 
-
     override fun onOptionsItemSelected(item: MenuItem) = when (item.itemId) {
         R.id.action_latlng -> {
             // User chose the "Settings" item, show the app settings UI...
             try {
-                val loc = locManager.getLastKnownLocation(LocationManager.PASSIVE_PROVIDER)
-                val msg = if(loc == null) "none" else "${loc.latitude}, ${loc.longitude}"
+                getLastKnownLocation()
+                val msg = if (lastLocation == null) "none" else "${lastLocation.latitude}, ${lastLocation.longitude}"
                 Toast.makeText(this@MapsActivity,
                         msg,
                         Toast.LENGTH_LONG).show()
+                showStationsOnScreen()
             } catch (e: SecurityException) {
                 Toast.makeText(this@MapsActivity,
                         e.message,
@@ -248,8 +267,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             if (!item.isChecked) {
                 showClusters()
                 item.setChecked(true)
-            }
-            else if (item.isChecked) {
+            } else if (item.isChecked) {
                 clearClusters()
                 item.setChecked(false)
             }
@@ -293,10 +311,11 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
      * installed Google Play services and returned to the app.
      */
     override fun onMapReady(googleMap: GoogleMap) {
+        checkPermission()
         mMap = googleMap
 
         try {
-            mMap.setMyLocationEnabled(true)
+            mMap.isMyLocationEnabled = true
 
         } catch (e: SecurityException) {
             Toast.makeText(this@MapsActivity, e.message, Toast.LENGTH_SHORT).show()
@@ -322,41 +341,13 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                     mapData["LPG"] = mPrice.getDouble("LPG")
 
                     form.open(mapData)
-                } catch (e: Exception) { Log.w("gastracker", e.message) }
+                } catch (e: Exception) {
+                    Log.w("gastracker", e.message)
+                }
             }
         }
 
-        val llbuilder = LatLngBounds.Builder()
 
-        try {
-            loader("on")
-            val loc = locManager.getLastKnownLocation(LocationManager.PASSIVE_PROVIDER)
-            rest.getStationsFromRadius(15000.0, LatLng(loc.latitude, loc.longitude), { data ->
-                if (data != null) {
-                    val stations = data.array()
-                    for (i in 0..(stations.length() - 1)) {
-                        val station = stations.getJSONObject(i)
-                        val coords = LatLng(station["lat"] as Double, station["lng"] as Double)
-                        val station_id = station["station_id"] as Int
-                        val network_id = station["network_id"] as Int
-                        val nname = gasNetworks.get(network_id)
-
-                        llbuilder.include(coords)
-                        val m = mMap.addMarker(MarkerOptions().position(coords))
-                        m.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.marker))
-                        m.tag = station
-                        stationMarkers.add(m)
-                    }
-                    mMap.animateCamera(CameraUpdateFactory.newLatLngBounds(llbuilder.build(), 100))
-                }
-                this@MapsActivity.loader("off")
-            }, { e-> this@MapsActivity.loader("off"); errorSnackbar(e.message) })
-
-        } catch (e: SecurityException) {
-            Toast.makeText(this@MapsActivity,
-                    e.message,
-                    Toast.LENGTH_SHORT).show()
-        }
 
         if (mOptionsMenu != null && mOptionsMenu!!.findItem(R.id.action_clusters).isChecked)
             showClusters()
@@ -365,7 +356,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
     fun showClusters(type: String = "Polygon") {
         loader("on")
-        rest.getClusters(bounding = type, resolve = {data ->
+        rest.getClusters(bounding = type, resolve = { data ->
             if (data != null) {
                 val llbuilder = LatLngBounds.Builder()
                 val clusters = data.array()
@@ -376,7 +367,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                     val bounding = cluster["bounding"] as JSONObject
                     val bcoordinates = bounding["coordinates"] as JSONArray
                     val btype = bounding["type"] as String
-                    val bcoordsarray = (if(btype == "Polygon") {
+                    val bcoordsarray = (if (btype == "Polygon") {
                         bcoordinates.getJSONArray(0)
                     } else if (btype == "LineString") {
                         bcoordinates
@@ -408,7 +399,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                 mMap.animateCamera(CameraUpdateFactory.newLatLngBounds(llbuilder.build(), 100))
             }
             this@MapsActivity.loader("off")
-        }, error = {e ->
+        }, error = { e ->
             this@MapsActivity.loader("off")
             errorSnackbar(e.message)
         })
@@ -445,7 +436,9 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                     popts.add(LatLng(latLng.lat, latLng.lng))
             }
             routePolyline.add(mMap.addPolyline(popts))
-        } catch (e: Exception) { errorSnackbar("Cannot draw route: missing data") }
+        } catch (e: Exception) {
+            errorSnackbar("Cannot draw route: missing data")
+        }
     }
 
     fun clearRoute() {
@@ -456,7 +449,8 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
     }
 
     private var pendingLoader = 0
-    @Synchronized fun loader(cmd: String) {
+    @Synchronized
+    fun loader(cmd: String) {
         if (cmd == "on") {
             this.findViewById<FrameLayout>(R.id.map_layer).alpha = 0.25f
             this.findViewById<ProgressBar>(R.id.loader).visibility = View.VISIBLE
@@ -503,12 +497,110 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         snack_action_view.setTextColor(Color.WHITE)
 
         // Set an action for snack bar
-        snackbar.setAction("Hide",{
+        snackbar.setAction("Hide", {
             // Hide the snack bar
             snackbar.dismiss()
         })
 
         // Finally, display the snack bar
         snackbar.show()
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        when (requestCode) {
+            0 -> {
+                if (grantResults.isNotEmpty())
+                    Log.i("gasTracker", "Permissions granted")
+            }
+        }
+    }
+
+    fun checkPermission() {
+        if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, permissions, 0)
+            return
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun getLastKnownLocation() {
+        fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+            if (location != null) {
+                lastLocation = location
+            }
+
+        }
+    }
+
+    private fun showStationsOnScreen() {
+        mMap.clear()
+        val llbuilder = LatLngBounds.Builder()
+
+        try {
+            loader("on")
+
+            val visibleRegion = mMap.projection.visibleRegion
+            val radius = calculateVisibleRadius(visibleRegion)
+            llbuilder.include(visibleRegion.latLngBounds.center)
+
+            rest.getStationsFromRadius(radius, visibleRegion.latLngBounds.center, { data ->
+                if (data != null) {
+                    val stations = data.array()
+                    for (i in 0..(stations.length() - 1)) {
+                        val station = stations.getJSONObject(i)
+                        val coords = LatLng(station["lat"] as Double, station["lng"] as Double)
+                        val station_id = station["station_id"] as Int
+                        val network_id = station["network_id"] as Int
+                        val nname = gasNetworks.get(network_id)
+
+                        llbuilder.include(coords)
+                        val m = mMap.addMarker(MarkerOptions().position(coords))
+                        m.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.marker))
+                        m.tag = station
+                        stationMarkers.add(m)
+                    }
+                    mMap.animateCamera(CameraUpdateFactory.newLatLngBounds(llbuilder.build(), 100))
+                }
+                this@MapsActivity.loader("off")
+            }, { e -> this@MapsActivity.loader("off"); errorSnackbar(e.message) })
+
+        } catch (e: Exception) {
+            Toast.makeText(this@MapsActivity,
+                    e.message,
+                    Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun calculateVisibleRadius(visibleRegion: VisibleRegion): Double {
+        var distanceWidth = FloatArray(1)
+        var distanceHeight = FloatArray(1)
+
+        val farRight: LatLng = visibleRegion.farRight
+        val farLeft: LatLng = visibleRegion.farLeft
+        val nearRight: LatLng = visibleRegion.nearRight
+        val nearLeft: LatLng = visibleRegion.nearLeft
+
+        //calculate the distance width (left <-> right of map on screen)
+        Location.distanceBetween(
+                (farLeft.latitude + nearLeft.latitude) / 2,
+                farLeft.longitude,
+                (farRight.latitude + nearRight.latitude) / 2,
+                farRight.longitude,
+                distanceWidth
+        )
+
+        //calculate the distance height (top <-> bottom of map on screen)
+        Location.distanceBetween(
+                farRight.latitude,
+                (farRight.longitude + farLeft.longitude) / 2,
+                nearRight.latitude,
+                (nearRight.longitude + nearLeft.longitude) / 2,
+                distanceHeight
+        )
+
+        //visible radius is (smaller distance) / 2:
+        if (distanceHeight[0] < distanceWidth[0])
+            return (distanceHeight[0]/2).toDouble()
+        else return (distanceWidth[0]/2).toDouble()
     }
 }
