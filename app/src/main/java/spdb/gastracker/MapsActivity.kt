@@ -15,6 +15,7 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.widget.*
+import com.github.kittinunf.fuel.Fuel
 import com.google.android.gms.common.api.Status
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
@@ -254,7 +255,8 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                 Toast.makeText(this@MapsActivity,
                         msg,
                         Toast.LENGTH_LONG).show()
-                showStationsOnScreen()
+                val currentPosition = LatLng(lastLocation.latitude, lastLocation.longitude)
+                showClusterStations(currentPosition, "PB95")
             } catch (e: SecurityException) {
                 Toast.makeText(this@MapsActivity,
                         e.message,
@@ -529,6 +531,57 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                 lastLocation = location
             }
 
+        }
+    }
+
+    private fun showClusterStations(currentLocation: LatLng, fuel: String){
+        mMap.clear()
+        val llbuilder = LatLngBounds.Builder()
+
+        try {
+            loader("on")
+
+            llbuilder.include(currentLocation)
+
+            rest.getClusterStations(currentLocation, fuel, { data ->
+                if (data != null) {
+                    val stations = data.obj()
+                    val cheapestStations = stations.getJSONArray("cheapest_stations")
+
+                    for (i in 0..(cheapestStations.length() - 1)) {
+                        val station = cheapestStations.getJSONObject(i)
+                        val coords = LatLng(station["lat"] as Double, station["lng"] as Double)
+                        val station_id = station["station_id"] as Int
+                        val network_id = station["network_id"] as Int
+                        val nname = gasNetworks.get(network_id)
+
+                        llbuilder.include(coords)
+                        val m = mMap.addMarker(MarkerOptions().position(coords))
+                        m.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.marker))
+                        m.tag = station
+                        stationMarkers.add(m)
+                    }
+
+                    val station = stations.getJSONObject("closest_station")
+                    val coords = LatLng(station["lat"] as Double, station["lng"] as Double)
+                    val station_id = station["station_id"] as Int
+                    val network_id = station["network_id"] as Int
+                    val nname = gasNetworks.get(network_id)
+
+                    llbuilder.include(coords)
+                    val m = mMap.addMarker(MarkerOptions().position(coords))
+                    m.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.marker))
+                    m.tag = station
+                    stationMarkers.add(m)
+                    mMap.animateCamera(CameraUpdateFactory.newLatLngBounds(llbuilder.build(), 100))
+                }
+                this@MapsActivity.loader("off")
+            }, { e -> this@MapsActivity.loader("off"); errorSnackbar(e.message) })
+
+        } catch (e: Exception) {
+            Toast.makeText(this@MapsActivity,
+                    e.message,
+                    Toast.LENGTH_SHORT).show()
         }
     }
 

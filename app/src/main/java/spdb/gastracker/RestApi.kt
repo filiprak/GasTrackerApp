@@ -31,6 +31,26 @@ class RestApi {
         })
     }
 
+    /** GET /cluster_stations?lat=x&lng=y&fuel=z
+     * cheapest stations and closest in cluster*/
+    fun getClusterStations(position: LatLng, fuel: String, resolve: (data: Json?) -> Any, error: (error: FuelError) -> Any) {
+        Log.i("restApi", "pobieram stacje z klastra")
+        "/cluster_stations".httpGet(listOf("lat" to position.latitude, "lng" to position.longitude, "fuel" to fuel)).responseJson({ request, response, result ->
+            val (data, err) = result
+
+            if (err == null) {
+                // success
+                Log.i("restApi", "RestApi.getClusterStations(OK): ${data.toString()}")
+                resolve(data)
+            } else {
+                // error
+                Log.e("restApi", "RestApi.getClusterStations(ERR): ${err}")
+                error(err)
+            }
+        })
+    }
+
+
     /** GET /station/<id> */
     fun getStation(id: Long, resolve: (data: Json?) -> Any, error: (error: FuelError) -> Any) {
         "/stations/${id}".httpGet().responseJson({ request, response, result ->
@@ -51,7 +71,7 @@ class RestApi {
     /** GET /stations?radius=xxx&lat=a.aaa&lng=b.bbb */
     fun getStationsFromRadius(radius: Double, middle: LatLng, resolve: (data: Json?) -> Any, error: (error: FuelError) -> Any) {
         "/stations".httpGet(listOf(
-            "radius" to radius, "lat" to middle.latitude, "lng" to middle.longitude
+                "radius" to radius, "lat" to middle.latitude, "lng" to middle.longitude
         )).responseJson({ request, response, result ->
             val (data, err) = result
 
@@ -70,7 +90,7 @@ class RestApi {
     /** GET /clusters?bounding=(Polygon | Circle) */
     fun getClusters(id: Long? = null, bounding: String? = "Polygon", resolve: (data: Json?) -> Any, error: (error: FuelError) -> Any) {
         (if (id != null) "/clusters/${id}" else "/clusters").httpGet(
-            if(bounding != null) listOf("bounding" to bounding) else listOf()
+                if (bounding != null) listOf("bounding" to bounding) else listOf()
 
         ).responseJson({ request, response, result ->
             val (data, err) = result
