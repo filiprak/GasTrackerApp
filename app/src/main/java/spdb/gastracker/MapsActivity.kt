@@ -16,9 +16,9 @@ import android.view.MenuItem
 import android.view.View
 import android.widget.*
 import com.github.kittinunf.fuel.Fuel
+import com.google.android.gms.common.api.ResolvableApiException
 import com.google.android.gms.common.api.Status
-import com.google.android.gms.location.FusedLocationProviderClient
-import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.*
 import com.google.android.gms.location.places.Place
 import com.google.android.gms.location.places.ui.PlaceAutocompleteFragment
 import com.google.android.gms.location.places.ui.PlaceSelectionListener
@@ -44,7 +44,10 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
     private lateinit var mMap: GoogleMap
     private lateinit var fusedLocationClient: FusedLocationProviderClient
-    var lastLocation = Location("kappa")
+    private var lastLocation = Location("kappa")
+    lateinit var locationCallback: LocationCallback
+    lateinit var locationRequest: LocationRequest
+    var locationUpdateState = false
 
     private var mOptionsMenu: Menu? = null
 
@@ -67,7 +70,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
     private var routeMarkers: MutableList<Marker> = mutableListOf<Marker>()
     private var routePolyline: MutableList<Polyline> = mutableListOf<Polyline>()
 
-    private val permissions = arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION, android.Manifest.permission.INTERNET)
+    private val permissions = arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION)
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -80,8 +83,19 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
         loader("on")
         Log.i("onCreate", "Odpala sie")
+
+
         lastLocation.latitude = 52.23
         lastLocation.longitude = 21.01
+        locationCallback = object :LocationCallback(){
+            override fun onLocationResult(p0: LocationResult?) {
+                super.onLocationResult(p0)
+                lastLocation = p0?.lastLocation ?: lastLocation
+                val currentPosition = LatLng(lastLocation.latitude, lastLocation.longitude)
+                showClusterStations(currentPosition, "PB95")
+            }
+        }
+        createLocationRequest()
 
 
         // init form
@@ -349,6 +363,8 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             }
         }
 
+        startLocationUpdates()
+
 
 
         if (mOptionsMenu != null && mOptionsMenu!!.findItem(R.id.action_clusters).isChecked)
@@ -517,15 +533,15 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         }
     }
 
-    fun checkPermission() {
+    private fun checkPermission() {
         if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, permissions, 0)
             return
         }
     }
 
-    @SuppressLint("MissingPermission")
     private fun getLastKnownLocation() {
+        checkPermission()
         fusedLocationClient.lastLocation.addOnSuccessListener { location ->
             if (location != null) {
                 lastLocation = location
@@ -534,12 +550,12 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         }
     }
 
-    private fun showClusterStations(currentLocation: LatLng, fuel: String){
+    private fun showClusterStations(currentLocation: LatLng, fuel: String) {
         mMap.clear()
         val llbuilder = LatLngBounds.Builder()
 
         try {
-            loader("on")
+           // loader("on")
 
             llbuilder.include(currentLocation)
 
@@ -575,7 +591,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                     stationMarkers.add(m)
                     mMap.animateCamera(CameraUpdateFactory.newLatLngBounds(llbuilder.build(), 100))
                 }
-                this@MapsActivity.loader("off")
+               // this@MapsActivity.loader("off")
             }, { e -> this@MapsActivity.loader("off"); errorSnackbar(e.message) })
 
         } catch (e: Exception) {
@@ -653,7 +669,33 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
         //visible radius is (smaller distance) / 2:
         if (distanceHeight[0] < distanceWidth[0])
-            return (distanceHeight[0]/2).toDouble()
-        else return (distanceWidth[0]/2).toDouble()
+            return (distanceHeight[0] / 2).toDouble()
+        else return (distanceWidth[0] / 2).toDouble()
+    }
+
+    private fun startLocationUpdates(){
+        checkPermission()
+        fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, null)
+    }
+
+    private fun createLocationRequest(){
+        locationRequest = LocationRequest()
+        locationRequest.interval = 10000
+        locationRequest.fastestInterval = 5000
+        locationRequest.priority = LocationRequest.PRIORITY_HIGH_ACCURACY
+
+        var builder = LocationSettingsRequest.Builder().addLocationRequest(locationRequest)
+        val client = LocationServices.getSettingsClient(this)
+        val task = client.checkLocationSettings(builder.build())
+
+        task.addOnSuccessListener {
+            locationUpdateState = true
+            startLocationUpdates()
+            Log.i("locationUpdate", "Location updates started")
+        }
+
+        task.addOnFailureListener{e ->
+            Log.e("locationUpdate", "Error while starting location updates: " + e.message)
+        }
     }
 }
