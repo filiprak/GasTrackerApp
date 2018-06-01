@@ -15,10 +15,11 @@
     </string>
     <string name="title_activity_maps">GoogleMap</string>
     <string name="action_settings">Menu</string>
-    <string name="action_latlng">Show LatLng</string>
+    <string name="action_stations">Show stations</string>
     <string name="new_station">Add station</string>
     <string name="point_symbol">.</string>
     <string name="action_clusters">Show clusters</string>
     <string name="action_route">New route</string>
     <string name="action_clear">Clear map</string>
+    <string name="auto_location">Auto location</string>
 </resources>

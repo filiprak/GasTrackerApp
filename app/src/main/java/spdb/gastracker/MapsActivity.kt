@@ -87,7 +87,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
         lastLocation.latitude = 52.23
         lastLocation.longitude = 21.01
-        locationCallback = object :LocationCallback(){
+        locationCallback = object : LocationCallback() {
             override fun onLocationResult(p0: LocationResult?) {
                 super.onLocationResult(p0)
                 lastLocation = p0?.lastLocation ?: lastLocation
@@ -261,7 +261,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
 
     override fun onOptionsItemSelected(item: MenuItem) = when (item.itemId) {
-        R.id.action_latlng -> {
+        R.id.action_stations -> {
             // User chose the "Settings" item, show the app settings UI...
             try {
                 getLastKnownLocation()
@@ -269,8 +269,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                 Toast.makeText(this@MapsActivity,
                         msg,
                         Toast.LENGTH_LONG).show()
-                val currentPosition = LatLng(lastLocation.latitude, lastLocation.longitude)
-                showClusterStations(currentPosition, "PB95")
+                showStationsOnScreen()
             } catch (e: SecurityException) {
                 Toast.makeText(this@MapsActivity,
                         e.message,
@@ -282,10 +281,21 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         R.id.action_clusters -> {
             if (!item.isChecked) {
                 showClusters()
-                item.setChecked(true)
+                item.isChecked = true
             } else if (item.isChecked) {
                 clearClusters()
-                item.setChecked(false)
+                item.isChecked = false
+            }
+            true
+        }
+
+        R.id.action_update -> {
+            if (item.isChecked) {
+                stopLocationUpdates()
+                item.isChecked = false
+            } else if (!item.isChecked) {
+                startLocationUpdates()
+                item.isChecked = true
             }
             true
         }
@@ -374,6 +384,10 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
     fun showClusters(type: String = "Polygon") {
         loader("on")
+        mOptionsMenu!!.findItem(R.id.action_update).isChecked = false
+        stopLocationUpdates()
+
+
         rest.getClusters(bounding = type, resolve = { data ->
             if (data != null) {
                 val llbuilder = LatLngBounds.Builder()
@@ -554,8 +568,11 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         mMap.clear()
         val llbuilder = LatLngBounds.Builder()
 
+        mOptionsMenu!!.findItem(R.id.action_clusters).isChecked = false
+        startLocationUpdates()
+
         try {
-           // loader("on")
+            // loader("on")
 
             llbuilder.include(currentLocation)
 
@@ -591,7 +608,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                     stationMarkers.add(m)
                     mMap.animateCamera(CameraUpdateFactory.newLatLngBounds(llbuilder.build(), 100))
                 }
-               // this@MapsActivity.loader("off")
+                // this@MapsActivity.loader("off")
             }, { e -> this@MapsActivity.loader("off"); errorSnackbar(e.message) })
 
         } catch (e: Exception) {
@@ -673,12 +690,15 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         else return (distanceWidth[0] / 2).toDouble()
     }
 
-    private fun startLocationUpdates(){
+    private fun startLocationUpdates() {
         checkPermission()
-        fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, null)
+        if (!locationUpdateState) {
+            fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, null)
+            locationUpdateState = true
+        }
     }
 
-    private fun createLocationRequest(){
+    private fun createLocationRequest() {
         locationRequest = LocationRequest()
         locationRequest.interval = 10000
         locationRequest.fastestInterval = 5000
@@ -689,13 +709,19 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         val task = client.checkLocationSettings(builder.build())
 
         task.addOnSuccessListener {
-            locationUpdateState = true
             startLocationUpdates()
             Log.i("locationUpdate", "Location updates started")
         }
 
-        task.addOnFailureListener{e ->
+        task.addOnFailureListener { e ->
             Log.e("locationUpdate", "Error while starting location updates: " + e.message)
+        }
+    }
+
+    private fun stopLocationUpdates() {
+        if (locationUpdateState) {
+            fusedLocationClient.removeLocationUpdates(locationCallback)
+            locationUpdateState = false
         }
     }
 }

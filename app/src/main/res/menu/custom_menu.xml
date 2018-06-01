@@ -5,21 +5,29 @@
         android:id="@+id/action_new_station"
         android:icon="@drawable/add_location"
         android:title="@string/new_station"
-        app:showAsAction="ifRoom"/>
+        app:showAsAction="ifRoom" />
 
     <!-- Settings, should always be in the overflow -->
-    <item android:id="@+id/action_settings"
+    <item
+        android:id="@+id/action_settings"
         android:title="@string/action_settings"
-        app:showAsAction="never"/>
+        app:showAsAction="never" />
 
-    <item android:id="@+id/action_latlng"
-        android:title="@string/action_latlng"
-        app:showAsAction="never"/>
+    <item
+        android:id="@+id/action_stations"
+        android:title="@string/action_stations"
+        app:showAsAction="never" />
 
     <item
         android:id="@+id/action_route"
         android:title="@string/action_route"
-        app:showAsAction="never"/>
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/action_update"
+        android:checkable="true"
+        android:checked="true"
+        android:title="@string/auto_location" />
 
     <item
         android:id="@+id/action_clusters"
@@ -30,6 +38,6 @@
     <item
         android:id="@+id/action_clear"
         android:title="@string/action_clear"
-        app:showAsAction="never"/>
+        app:showAsAction="never" />
 
 </menu>
