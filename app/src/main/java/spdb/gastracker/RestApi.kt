@@ -107,6 +107,26 @@ class RestApi {
         })
     }
 
+    /** GET /prices?station_id=?&LPG=?&ON=?... */
+    fun updatePrice(id: Long, prices: Map<String, Any>, resolve: (data: Json?) -> Any, error: (error: FuelError) -> Any) {
+        var params = listOf<Pair<String, Any>>("station_id" to id)
+        params += prices.toList()
+
+        "/prices".httpGet(params).responseJson({ request, response, result ->
+            val (data, err) = result
+
+            if (err == null) {
+                // success
+                Log.i("gastracker", "RestApi.updatePrice(OK): ${data.toString()}")
+                resolve(data)
+            } else {
+                // error
+                Log.e("gastracker", "RestApi.updatePrice(ERR): ${err}")
+                error(err)
+            }
+        })
+    }
+
     init {
         FuelManager.instance.basePath = serverBaseUrl
     }

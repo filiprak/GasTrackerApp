@@ -23,8 +23,10 @@ open class DialogForm(context: Context, layout: Int, title: String, schema: Map<
 
     val sch: Map<String, Int>
 
+    var successCallback: ((data: Map<String, Any>?)->Any)? = null
 
-    fun open(data: Map<String, Any>?) {
+
+    fun open(data: Map<String, Any>?, callback: (data: Map<String, Any>?)->Any = {}) {
         if (data != null) {
             for ((attr, value) in data) {
                 val cview = dialogView.findViewById<View>(sch.get(attr)!!)
@@ -46,28 +48,21 @@ open class DialogForm(context: Context, layout: Int, title: String, schema: Map<
                 } else if (cview is NumberPicker) {
                     (cview as NumberPicker).value = value as Int
                 } else if (cview is PricePicker) {
-                    if (value is Double)
-                        (cview as PricePicker).setPrice((value as Double).toFloat())
-                    else if (value is Float)
-                        (cview as PricePicker).setPrice(value as Float)
-                    else if(value is Int)
-                        (cview as PricePicker).setPrice((value as Int).toFloat())
-                    else
-                        (cview as PricePicker).setPrice((value as Number).toFloat())
+                    (cview as PricePicker).setPrice((value as Number).toFloat())
                 } else if (cview is Spinner) {
                     val spinner = (cview as Spinner)
                     for (i in 0..(spinner.count - 1)) {
-                        if (value == spinner.getItemIdAtPosition(i)) {
+                        Log.i("spinner:debug", "${value} ==? ${spinner.getItemIdAtPosition(i)}")
+                        if (value.toString() == (spinner.getItemIdAtPosition(i)).toString()) {
                             spinner.setSelection(i)
                             break
                         }
                     }
-                } else if (cview is PlaceAutocompleteFragment) {
-                    (cview as PlaceAutocompleteFragment)
                 }
             }
         }
 
+        successCallback = callback
         builder.show();
     }
 
@@ -106,7 +101,7 @@ open class DialogForm(context: Context, layout: Int, title: String, schema: Map<
     }
 
     open fun success(data: Map<String, Any>) {
-        Log.w("gastracker", "Warning: Form result: ${Gson().toJson(data)}");
+        Log.w("gastracker", "Warning: Form result: ${Gson().toJson(data)}")
     }
 
     open fun initialise(builder: AlertDialog.Builder, view: View, schema: Map<String, Int>) {}
@@ -119,14 +114,21 @@ open class DialogForm(context: Context, layout: Int, title: String, schema: Map<
         builder.setView(dialogView)
         builder.setPositiveButton("Ok") { dialog, p1 ->
             // return form value
-            success(getData())
+            val data = getData()
+            success(data)
+            if (successCallback != null) {
+                successCallback!!(data)
+                successCallback = null
+            }
         }
         builder.setNegativeButton("Cancel") { dialog, p1 ->
             dialog.dismiss()
+            successCallback = null
         }
 
         builder.setOnDismissListener { dialogInterface ->
             (dialogView.getParent() as ViewGroup).removeView(dialogView)
+            successCallback = null
         }
 
         initialise(builder, dialogView, sch)

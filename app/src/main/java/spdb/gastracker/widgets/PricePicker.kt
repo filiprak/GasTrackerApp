@@ -2,11 +2,13 @@ package spdb.gastracker.widgets
 
 import android.content.Context
 import android.util.AttributeSet
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.NumberPicker
 import spdb.gastracker.R
+import kotlin.math.roundToInt
 
 
 class PricePicker @JvmOverloads constructor(
@@ -41,12 +43,14 @@ class PricePicker @JvmOverloads constructor(
 
     fun setPrice(price: Float) {
         var big = price.toInt()
-        var sm = ((price - big) * 100.0f).toInt()
+        var sm = ((price - big) * 100.0f).roundToInt()
 
         if (big > bigPrice.maxValue) big = bigPrice.maxValue
         if (big < bigPrice.minValue) big = bigPrice.minValue
-        if (big > smallPrice.maxValue) big = smallPrice.maxValue
-        if (big < smallPrice.minValue) big = smallPrice.minValue
+        if (sm > smallPrice.maxValue) sm = smallPrice.maxValue
+        if (sm < smallPrice.minValue) sm = smallPrice.minValue
+
+        Log.i("prices", "Original price: ${price}, big: ${big}, small: ${sm}, diff: ${(price - big) * 100.0f}")
 
         smallPrice.value = sm
         bigPrice.value = big

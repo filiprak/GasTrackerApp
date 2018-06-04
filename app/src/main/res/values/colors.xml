@@ -8,6 +8,7 @@
     <color name="clusterFill">#a00988ff</color>
     <color name="clusterBound">#c9184393</color>
 
-    <color name="errorSnackbarColor">#ebff1b1f</color>
+    <color name="errorSnackbarColor">#e0ff1b1f</color>
     <color name="routeLine">#d3b91bac</color>
+    <color name="okSnackbarColor">#dd39b300</color>
 </resources>

@@ -42,7 +42,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="5.23 PLN" />
+                android:text="None" />
 
         </TableRow>
 
@@ -63,7 +63,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="5.44 PLN" />
+                android:text="None" />
 
         </TableRow>
 
@@ -84,7 +84,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="2.13 PLN" />
+                android:text="None" />
         </TableRow>
 
         <TableRow
@@ -105,7 +105,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="10 apr 2018" />
+                android:text="None" />
 
         </TableRow>
 

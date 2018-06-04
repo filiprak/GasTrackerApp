@@ -131,17 +131,13 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                 view.findViewById<CheckBox>(R.id.lpg_checkBox).setOnCheckedChangeListener({ compoundButton, b ->
                     lpg_control.isEnabled = b
                 })
-
-                // add networks
-                val netw_spinner = view.findViewById<Spinner>(R.id.station_network)
-
             }
         }
         // route form
         routeForm = object : DialogForm(this@MapsActivity, R.layout.route_form, "New route", mapOf()) {
             override fun success(data: Map<String, Any>) {
                 if (routeOrigin == null || routeDest == null) {
-                    errorSnackbar("Please enter route origin and destination")
+                    snackbar(message="Please enter route origin and destination")
                     return
                 }
 
@@ -154,7 +150,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                         .setCallback(object : com.google.maps.PendingResult.Callback<DirectionsResult> {
                             override fun onFailure(e: Throwable?) {
                                 runOnUiThread {
-                                    errorSnackbar("Failed to create route: ${e?.message}")
+                                    snackbar(message="Failed to create route: ${e?.message}")
                                     this@MapsActivity.loader("off")
                                 }
                             }
@@ -196,7 +192,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                     }
 
                     override fun onError(p0: Status?) {
-                        errorSnackbar("Place selection error: ${p0}")
+                        snackbar(message="Place selection error: ${p0}")
                     }
                 })
                 destplace.setOnPlaceSelectedListener(object : PlaceSelectionListener {
@@ -207,7 +203,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                     }
 
                     override fun onError(p0: Status?) {
-                        errorSnackbar("Place selection error: ${p0}")
+                        snackbar(message="Place selection error: ${p0}")
                     }
                 })
             }
@@ -239,7 +235,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             this@MapsActivity.loader("off")
         }, { e ->
             Log.e("restApi", "getNetworksError: " + e.message)
-            this@MapsActivity.loader("off"); errorSnackbar(e.message)
+            this@MapsActivity.loader("off"); snackbar(message=e.message)
         })
 
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
@@ -366,7 +362,21 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                     mapData["ON"] = mPrice.getDouble("ON")
                     mapData["LPG"] = mPrice.getDouble("LPG")
 
-                    form.open(mapData)
+                    form.open(mapData, { data ->
+                        val filtered = data!!.filterKeys { s: String -> s in arrayListOf("LPG", "ON", "PB95")  }
+                        rest.updatePrice(mData.getLong("station_id"), filtered, { response ->
+                            if (response != null) {
+                                val jsondata = response.obj()
+                                mData.putOpt("PB95", jsondata.optDouble("PB95"))
+                                mData.putOpt("ON", jsondata.optDouble("ON"))
+                                mData.putOpt("LPG", jsondata.optDouble("LPG"))
+                            }
+
+                            snackbar(type="ok", message="Prices updated successfully")
+                        }, { err ->
+                            snackbar(message="Error when updating price: ${err.message}")
+                        })
+                    })
                 } catch (e: Exception) {
                     Log.w("gastracker", e.message)
                 }
@@ -433,7 +443,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             this@MapsActivity.loader("off")
         }, error = { e ->
             this@MapsActivity.loader("off")
-            errorSnackbar(e.message)
+            snackbar(message=e.message)
         })
     }
 
@@ -469,7 +479,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             }
             routePolyline.add(mMap.addPolyline(popts))
         } catch (e: Exception) {
-            errorSnackbar("Cannot draw route: missing data")
+            snackbar(message="Cannot draw route: missing data")
         }
     }
 
@@ -499,11 +509,11 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
     }
 
 
-    fun errorSnackbar(message: String?) {
+    fun snackbar(type: String = "error", message: String?) {
 
         val snackbar = Snackbar.make(
                 findViewById(android.R.id.content),
-                if (!(message is String)) "Unknown error" else message,
+                if (!(message is String)) "No message" else message,
                 Snackbar.LENGTH_INDEFINITE
         )
 
@@ -520,7 +530,8 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                 .findViewById<Button>(android.support.design.R.id.snackbar_action)
 
         // Change the snack bar root view background color
-        snack_root_view.setBackgroundColor(ResourcesCompat.getColor(getResources(), R.color.errorSnackbarColor, null))
+        val color = if(type == "error") R.color.errorSnackbarColor else if(type == "ok") R.color.okSnackbarColor else 0
+        snack_root_view.setBackgroundColor(ResourcesCompat.getColor(getResources(), color, null))
 
         // Change the snack bar text view text color
         snack_text_view.setTextColor(Color.WHITE)
@@ -587,6 +598,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                         val station_id = station["station_id"] as Int
                         val network_id = station["network_id"] as Int
                         val nname = gasNetworks.get(network_id)
+                        station.put("network_name", if(nname == null) "None" else nname.network_name)
 
                         llbuilder.include(coords)
                         val m = mMap.addMarker(MarkerOptions().position(coords))
@@ -600,6 +612,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                     val station_id = station["station_id"] as Int
                     val network_id = station["network_id"] as Int
                     val nname = gasNetworks.get(network_id)
+                    station.put("network_name", if(nname == null) "None" else nname.network_name)
 
                     llbuilder.include(coords)
                     val m = mMap.addMarker(MarkerOptions().position(coords))
@@ -609,7 +622,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                     mMap.animateCamera(CameraUpdateFactory.newLatLngBounds(llbuilder.build(), 100))
                 }
                 // this@MapsActivity.loader("off")
-            }, { e -> this@MapsActivity.loader("off"); errorSnackbar(e.message) })
+            }, { e -> this@MapsActivity.loader("off"); snackbar(message=e.message) })
 
         } catch (e: Exception) {
             Toast.makeText(this@MapsActivity,
@@ -638,6 +651,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                         val station_id = station["station_id"] as Int
                         val network_id = station["network_id"] as Int
                         val nname = gasNetworks.get(network_id)
+                        station.put("network_name", if(nname == null) "None" else nname.network_name)
 
                         llbuilder.include(coords)
                         val m = mMap.addMarker(MarkerOptions().position(coords))
@@ -648,7 +662,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                     mMap.animateCamera(CameraUpdateFactory.newLatLngBounds(llbuilder.build(), 100))
                 }
                 this@MapsActivity.loader("off")
-            }, { e -> this@MapsActivity.loader("off"); errorSnackbar(e.message) })
+            }, { e -> this@MapsActivity.loader("off"); snackbar(message=e.message) })
 
         } catch (e: Exception) {
             Toast.makeText(this@MapsActivity,
