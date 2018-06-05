@@ -13,7 +13,7 @@
     <string name="permission_rationale">"Contacts permissions are needed for providing email
         completions."
     </string>
-    <string name="title_activity_maps">GoogleMap</string>
+    <string name="title_activity_maps">Gas Tracker</string>
     <string name="action_settings">Menu</string>
     <string name="action_stations">Show stations</string>
     <string name="new_station">Add station</string>

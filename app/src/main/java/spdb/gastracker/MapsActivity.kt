@@ -602,7 +602,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
                         llbuilder.include(coords)
                         val m = mMap.addMarker(MarkerOptions().position(coords))
-                        m.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.marker))
+                        m.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.marker_green))
                         m.tag = station
                         stationMarkers.add(m)
                     }
@@ -616,7 +616,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
                     llbuilder.include(coords)
                     val m = mMap.addMarker(MarkerOptions().position(coords))
-                    m.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.marker))
+                    m.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.marker_red))
                     m.tag = station
                     stationMarkers.add(m)
                     mMap.animateCamera(CameraUpdateFactory.newLatLngBounds(llbuilder.build(), 100))
@@ -655,7 +655,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
                         llbuilder.include(coords)
                         val m = mMap.addMarker(MarkerOptions().position(coords))
-                        m.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.marker))
+                        m.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.marker_blue))
                         m.tag = station
                         stationMarkers.add(m)
                     }
