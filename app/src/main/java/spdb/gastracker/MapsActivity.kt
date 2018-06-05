@@ -1,6 +1,5 @@
 package spdb.gastracker
 
-import android.annotation.SuppressLint
 import android.app.AlertDialog
 import android.content.pm.PackageManager
 import android.graphics.Color
@@ -15,28 +14,19 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.widget.*
-import com.github.kittinunf.fuel.Fuel
-import com.google.android.gms.common.api.ResolvableApiException
-import com.google.android.gms.common.api.Status
 import com.google.android.gms.location.*
-import com.google.android.gms.location.places.Place
-import com.google.android.gms.location.places.ui.PlaceAutocompleteFragment
-import com.google.android.gms.location.places.ui.PlaceSelectionListener
-
-import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.*
 import com.google.gson.Gson
-import com.google.maps.DirectionsApi
-import com.google.maps.GeoApiContext
-import com.google.maps.model.DirectionsResult
-import com.google.maps.model.TravelMode
-import org.json.JSONArray
 import spdb.gastracker.utils.DialogForm
 import spdb.gastracker.widgets.PricePicker
 import org.json.JSONObject
+import spdb.gastracker.tasks.CheapestClosestTask
+import spdb.gastracker.tasks.NewRouteTask
+import spdb.gastracker.tasks.ShowClustersTask
+import spdb.gastracker.tasks.ShowStationsTask
 import spdb.gastracker.widgets.StationInfoWindowAdapter
 
 
@@ -44,33 +34,27 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
     private lateinit var mMap: GoogleMap
     private lateinit var fusedLocationClient: FusedLocationProviderClient
-    private var lastLocation = Location("kappa")
+    var lastLocation = Location("kappa")
     lateinit var locationCallback: LocationCallback
     lateinit var locationRequest: LocationRequest
     var locationUpdateState = false
 
-    private var mOptionsMenu: Menu? = null
+    var mOptionsMenu: Menu? = null
 
     private lateinit var form: DialogForm
-    private lateinit var routeForm: DialogForm
 
-    private var gasNetworks: HashMap<Int, GasNetwork> = hashMapOf()
+    var gasNetworks: HashMap<Int, GasNetwork> = hashMapOf()
 
     private lateinit var rest: RestApi
 
-    // map data cache
-    private var stationMarkers: MutableList<Marker> = mutableListOf<Marker>()
-    private var clusterPolygons: MutableList<Polygon> = mutableListOf<Polygon>()
-    private var cluster_centerMarkers: MutableList<Marker> = mutableListOf<Marker>()
-
-    // route endpoints
-    var geoApiContext: GeoApiContext? = null
-    var routeOrigin: Place? = null
-    var routeDest: Place? = null
-    private var routeMarkers: MutableList<Marker> = mutableListOf<Marker>()
-    private var routePolyline: MutableList<Polyline> = mutableListOf<Polyline>()
-
     private val permissions = arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION)
+
+
+    /* activity tasks refactored*/
+    private lateinit var cheapestClosestTask: CheapestClosestTask
+    private lateinit var showStationsTask: ShowStationsTask
+    private lateinit var showClustersTask: ShowClustersTask
+    private lateinit var newRouteTask: NewRouteTask
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -83,20 +67,6 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
         loader("on")
         Log.i("onCreate", "Odpala sie")
-
-
-        lastLocation.latitude = 52.23
-        lastLocation.longitude = 21.01
-        locationCallback = object : LocationCallback() {
-            override fun onLocationResult(p0: LocationResult?) {
-                super.onLocationResult(p0)
-                lastLocation = p0?.lastLocation ?: lastLocation
-                val currentPosition = LatLng(lastLocation.latitude, lastLocation.longitude)
-                showClusterStations(currentPosition, "PB95")
-            }
-        }
-        createLocationRequest()
-
 
         // init form
         form = object : DialogForm(this@MapsActivity, R.layout.station_form, "Gas station", mapOf(
@@ -133,81 +103,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                 })
             }
         }
-        // route form
-        routeForm = object : DialogForm(this@MapsActivity, R.layout.route_form, "New route", mapOf()) {
-            override fun success(data: Map<String, Any>) {
-                if (routeOrigin == null || routeDest == null) {
-                    snackbar(message="Please enter route origin and destination")
-                    return
-                }
 
-                loader("on")
-                if (geoApiContext == null) geoApiContext = createGeoApiContext()
-                DirectionsApi.newRequest(geoApiContext)
-                        .mode(TravelMode.DRIVING)
-                        .origin(com.google.maps.model.LatLng(routeOrigin!!.latLng.latitude, routeOrigin!!.latLng.longitude))
-                        .destination(com.google.maps.model.LatLng(routeDest!!.latLng.latitude, routeDest!!.latLng.longitude))
-                        .setCallback(object : com.google.maps.PendingResult.Callback<DirectionsResult> {
-                            override fun onFailure(e: Throwable?) {
-                                runOnUiThread {
-                                    snackbar(message="Failed to create route: ${e?.message}")
-                                    this@MapsActivity.loader("off")
-                                }
-                            }
-
-                            override fun onResult(result: DirectionsResult?) {
-                                if (result != null) {
-                                    // draw route
-                                    runOnUiThread {
-                                        drawRoute(result)
-                                        val llbuilder = LatLngBounds.Builder()
-                                        var empty = true
-                                        routePolyline.forEach { polyline: Polyline ->
-                                            polyline.points.forEach { latLng: LatLng? ->
-                                                if (latLng != null) llbuilder.include(latLng)
-                                                empty = false
-                                            }
-                                        }
-                                        if (!empty)
-                                            mMap.animateCamera(CameraUpdateFactory.newLatLngBounds(llbuilder.build(), 100))
-                                        this@MapsActivity.loader("off")
-                                    }
-                                }
-                            }
-
-                        })
-
-                Log.i("gastracker", "Route: origin: ${routeOrigin?.address}, dest: ${routeDest?.address}")
-            }
-
-            override fun initialise(builder: AlertDialog.Builder, view: View, schema: Map<String, Int>) {
-                val originplace = fragmentManager.findFragmentById(R.id.origin_fragment) as PlaceAutocompleteFragment
-                val destplace = fragmentManager.findFragmentById(R.id.dest_fragment) as PlaceAutocompleteFragment
-
-                originplace.setOnPlaceSelectedListener(object : PlaceSelectionListener {
-                    override fun onPlaceSelected(p: Place?) {
-                        if (p != null) {
-                            routeOrigin = p
-                        }
-                    }
-
-                    override fun onError(p0: Status?) {
-                        snackbar(message="Place selection error: ${p0}")
-                    }
-                })
-                destplace.setOnPlaceSelectedListener(object : PlaceSelectionListener {
-                    override fun onPlaceSelected(p: Place?) {
-                        if (p != null) {
-                            routeDest = p
-                        }
-                    }
-
-                    override fun onError(p0: Status?) {
-                        snackbar(message="Place selection error: ${p0}")
-                    }
-                })
-            }
-        }
 
         // init rest api instance
         rest = RestApi()
@@ -239,13 +135,6 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         })
 
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
-
-    }
-
-    private fun createGeoApiContext(): GeoApiContext {
-        return GeoApiContext.Builder()
-                .apiKey(getString(R.string.google_maps_key))
-                .build()
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -265,21 +154,20 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                 Toast.makeText(this@MapsActivity,
                         msg,
                         Toast.LENGTH_LONG).show()
-                showStationsOnScreen()
+                showStationsTask.start()
+
             } catch (e: SecurityException) {
-                Toast.makeText(this@MapsActivity,
-                        e.message,
-                        Toast.LENGTH_SHORT).show()
+                snackbar(message = e.message)
             }
             true
         }
 
         R.id.action_clusters -> {
             if (!item.isChecked) {
-                showClusters()
+                showClustersTask.start()
                 item.isChecked = true
             } else if (item.isChecked) {
-                clearClusters()
+                showClustersTask.clean()
                 item.isChecked = false
             }
             true
@@ -297,7 +185,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         }
 
         R.id.action_route -> {
-            pickRoute()
+            newRouteTask.start()
             true
         }
 
@@ -350,8 +238,6 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                     val mData: JSONObject = marker.tag as JSONObject
                     val mPrice: JSONObject = mData["price"] as JSONObject
 
-                    Log.i("gastracker", mData.toString())
-
                     val mapData = HashMap<String, Any>()
                     mapData["network_id"] = mData["network_id"]
                     mapData["hasPB95"] = mPrice.get("PB95") != null
@@ -378,116 +264,39 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                         })
                     })
                 } catch (e: Exception) {
+                    snackbar(type="error", message=e.message)
                     Log.w("gastracker", e.message)
                 }
             }
         }
 
+        // init tasks
+        cheapestClosestTask = CheapestClosestTask(this@MapsActivity, mMap, rest)
+        cheapestClosestTask.prepare()
+        newRouteTask = NewRouteTask(this@MapsActivity, mMap, rest)
+        newRouteTask.prepare()
+        showClustersTask = ShowClustersTask(this@MapsActivity, mMap, rest)
+        showClustersTask.prepare()
+        showStationsTask = ShowStationsTask(this@MapsActivity, mMap, rest)
+        showStationsTask.prepare()
+
+        // init location handling
+        lastLocation.latitude = 52.23
+        lastLocation.longitude = 21.01
+        locationCallback = object : LocationCallback() {
+            override fun onLocationResult(p0: LocationResult?) {
+                super.onLocationResult(p0)
+                lastLocation = p0?.lastLocation ?: lastLocation
+                val currentPosition = LatLng(lastLocation.latitude, lastLocation.longitude)
+                cheapestClosestTask.start(currentPosition)
+            }
+        }
+        createLocationRequest()
         startLocationUpdates()
 
-
-
         if (mOptionsMenu != null && mOptionsMenu!!.findItem(R.id.action_clusters).isChecked)
-            showClusters()
-        else clearClusters()
-    }
-
-    fun showClusters(type: String = "Polygon") {
-        loader("on")
-        mOptionsMenu!!.findItem(R.id.action_update).isChecked = false
-        stopLocationUpdates()
-
-
-        rest.getClusters(bounding = type, resolve = { data ->
-            if (data != null) {
-                val llbuilder = LatLngBounds.Builder()
-                val clusters = data.array()
-
-                for (i in 0..(clusters.length() - 1)) {
-                    val cluster = clusters.getJSONObject(i)
-                    val coords = LatLng(cluster["lat"] as Double, cluster["lng"] as Double)
-                    val bounding = cluster["bounding"] as JSONObject
-                    val bcoordinates = bounding["coordinates"] as JSONArray
-                    val btype = bounding["type"] as String
-                    val bcoordsarray = (if (btype == "Polygon") {
-                        bcoordinates.getJSONArray(0)
-                    } else if (btype == "LineString") {
-                        bcoordinates
-                    } else if (btype == "Point") {
-                        JSONArray().put(bcoordinates)
-                    } else JSONArray())
-
-                    val cluster_id = cluster["cluster_id"] as Int
-
-                    llbuilder.include(coords)
-                    val popts = PolygonOptions()
-                            .fillColor(ResourcesCompat.getColor(getResources(), R.color.clusterFill, null))
-                            .strokeColor(ResourcesCompat.getColor(getResources(), R.color.clusterBound, null))
-                            .strokeWidth(3.0f)
-
-                    for (i in 0..(bcoordsarray.length() - 1)) {
-                        val pcoords = bcoordsarray.getJSONArray(i)
-                        val latlng = LatLng(pcoords.getDouble(0), pcoords.getDouble(1))
-                        popts.add(latlng)
-                    }
-                    val p = mMap.addPolygon(popts)
-                    clusterPolygons.add(p)
-                    val m = mMap.addMarker(MarkerOptions().position(coords))
-                    cluster_centerMarkers.add(m)
-                    m.setAnchor(0.5f, 0.5f)
-                    m.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.target_red))
-                    p.tag = cluster
-                }
-                mMap.animateCamera(CameraUpdateFactory.newLatLngBounds(llbuilder.build(), 100))
-            }
-            this@MapsActivity.loader("off")
-        }, error = { e ->
-            this@MapsActivity.loader("off")
-            snackbar(message=e.message)
-        })
-    }
-
-    fun clearClusters() {
-        clusterPolygons.forEach { polygon: Polygon -> polygon.remove() }
-        cluster_centerMarkers.forEach { marker: Marker -> marker.remove() }
-    }
-
-    fun pickRoute() {
-        routeForm.open(null)
-    }
-
-    fun drawRoute(results: DirectionsResult) {
-        clearRoute()
-        try {
-            routeMarkers.add(mMap.addMarker(MarkerOptions()
-                    .position(LatLng(results.routes[0].legs[0].startLocation.lat, results.routes[0].legs[0].startLocation.lng))
-                    .title(results.routes[0].legs[0].startAddress)))
-            routeMarkers.add(mMap.addMarker(MarkerOptions()
-                    .position(LatLng(results.routes[0].legs[0].endLocation.lat, results.routes[0].legs[0].endLocation.lng))
-                    .title(results.routes[0].legs[0].startAddress)
-                    .snippet("Time : ${results.routes[0].legs[0].duration.humanReadable}" +
-                            " Distance : ${results.routes[0].legs[0].distance.humanReadable}")))
-            val decodedPath = results.routes[0].overviewPolyline.decodePath()
-            val popts = PolylineOptions()
-                    .color(ResourcesCompat.getColor(getResources(), R.color.routeLine, null))
-                    .jointType(JointType.ROUND)
-                    .width(20.0f)
-
-            decodedPath.forEach { latLng: com.google.maps.model.LatLng? ->
-                if (latLng != null)
-                    popts.add(LatLng(latLng.lat, latLng.lng))
-            }
-            routePolyline.add(mMap.addPolyline(popts))
-        } catch (e: Exception) {
-            snackbar(message="Cannot draw route: missing data")
-        }
-    }
-
-    fun clearRoute() {
-        routePolyline.forEach { polyline: Polyline -> polyline.remove() }
-        routeMarkers.forEach { marker: Marker -> marker.remove() }
-        routePolyline.clear()
-        routeMarkers.clear()
+            showStationsTask.start()
+        else showClustersTask.clean()
     }
 
     private var pendingLoader = 0
@@ -507,7 +316,6 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         }
         Log.i("gastracker_loader", "Toggle loader(${cmd}) [${pendingLoader}]: thread: ${Thread.currentThread()}")
     }
-
 
     fun snackbar(type: String = "error", message: String?) {
 
@@ -575,143 +383,6 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         }
     }
 
-    private fun showClusterStations(currentLocation: LatLng, fuel: String) {
-        mMap.clear()
-        val llbuilder = LatLngBounds.Builder()
-
-        mOptionsMenu!!.findItem(R.id.action_clusters).isChecked = false
-        startLocationUpdates()
-
-        try {
-            // loader("on")
-
-            llbuilder.include(currentLocation)
-
-            rest.getClusterStations(currentLocation, fuel, { data ->
-                if (data != null) {
-                    val stations = data.obj()
-                    val cheapestStations = stations.getJSONArray("cheapest_stations")
-
-                    for (i in 0..(cheapestStations.length() - 1)) {
-                        val station = cheapestStations.getJSONObject(i)
-                        val coords = LatLng(station["lat"] as Double, station["lng"] as Double)
-                        val station_id = station["station_id"] as Int
-                        val network_id = station["network_id"] as Int
-                        val nname = gasNetworks.get(network_id)
-                        station.put("network_name", if(nname == null) "None" else nname.network_name)
-
-                        llbuilder.include(coords)
-                        val m = mMap.addMarker(MarkerOptions().position(coords))
-                        m.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.marker_green))
-                        m.tag = station
-                        stationMarkers.add(m)
-                    }
-
-                    val station = stations.getJSONObject("closest_station")
-                    val coords = LatLng(station["lat"] as Double, station["lng"] as Double)
-                    val station_id = station["station_id"] as Int
-                    val network_id = station["network_id"] as Int
-                    val nname = gasNetworks.get(network_id)
-                    station.put("network_name", if(nname == null) "None" else nname.network_name)
-
-                    llbuilder.include(coords)
-                    val m = mMap.addMarker(MarkerOptions().position(coords))
-                    m.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.marker_red))
-                    m.tag = station
-                    stationMarkers.add(m)
-                    mMap.animateCamera(CameraUpdateFactory.newLatLngBounds(llbuilder.build(), 100))
-                }
-                // this@MapsActivity.loader("off")
-            }, { e -> this@MapsActivity.loader("off"); snackbar(message=e.message) })
-
-        } catch (e: Exception) {
-            Toast.makeText(this@MapsActivity,
-                    e.message,
-                    Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    private fun showStationsOnScreen() {
-        mMap.clear()
-        val llbuilder = LatLngBounds.Builder()
-
-        try {
-            loader("on")
-
-            val visibleRegion = mMap.projection.visibleRegion
-            val radius = calculateVisibleRadius(visibleRegion)
-            llbuilder.include(visibleRegion.latLngBounds.center)
-
-            rest.getStationsFromRadius(radius, visibleRegion.latLngBounds.center, { data ->
-                if (data != null) {
-                    val stations = data.array()
-                    for (i in 0..(stations.length() - 1)) {
-                        val station = stations.getJSONObject(i)
-                        val coords = LatLng(station["lat"] as Double, station["lng"] as Double)
-                        val station_id = station["station_id"] as Int
-                        val network_id = station["network_id"] as Int
-                        val nname = gasNetworks.get(network_id)
-                        station.put("network_name", if(nname == null) "None" else nname.network_name)
-
-                        llbuilder.include(coords)
-                        val m = mMap.addMarker(MarkerOptions().position(coords))
-                        m.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.marker_blue))
-                        m.tag = station
-                        stationMarkers.add(m)
-                    }
-                    mMap.animateCamera(CameraUpdateFactory.newLatLngBounds(llbuilder.build(), 100))
-                }
-                this@MapsActivity.loader("off")
-            }, { e -> this@MapsActivity.loader("off"); snackbar(message=e.message) })
-
-        } catch (e: Exception) {
-            Toast.makeText(this@MapsActivity,
-                    e.message,
-                    Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    private fun calculateVisibleRadius(visibleRegion: VisibleRegion): Double {
-        var distanceWidth = FloatArray(1)
-        var distanceHeight = FloatArray(1)
-
-        val farRight: LatLng = visibleRegion.farRight
-        val farLeft: LatLng = visibleRegion.farLeft
-        val nearRight: LatLng = visibleRegion.nearRight
-        val nearLeft: LatLng = visibleRegion.nearLeft
-
-        //calculate the distance width (left <-> right of map on screen)
-        Location.distanceBetween(
-                (farLeft.latitude + nearLeft.latitude) / 2,
-                farLeft.longitude,
-                (farRight.latitude + nearRight.latitude) / 2,
-                farRight.longitude,
-                distanceWidth
-        )
-
-        //calculate the distance height (top <-> bottom of map on screen)
-        Location.distanceBetween(
-                farRight.latitude,
-                (farRight.longitude + farLeft.longitude) / 2,
-                nearRight.latitude,
-                (nearRight.longitude + nearLeft.longitude) / 2,
-                distanceHeight
-        )
-
-        //visible radius is (smaller distance) / 2:
-        if (distanceHeight[0] < distanceWidth[0])
-            return (distanceHeight[0] / 2).toDouble()
-        else return (distanceWidth[0] / 2).toDouble()
-    }
-
-    private fun startLocationUpdates() {
-        checkPermission()
-        if (!locationUpdateState) {
-            fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, null)
-            locationUpdateState = true
-        }
-    }
-
     private fun createLocationRequest() {
         locationRequest = LocationRequest()
         locationRequest.interval = 10000
@@ -732,7 +403,15 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         }
     }
 
-    private fun stopLocationUpdates() {
+    fun startLocationUpdates() {
+        checkPermission()
+        if (!locationUpdateState) {
+            fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, null)
+            locationUpdateState = true
+        }
+    }
+
+    fun stopLocationUpdates() {
         if (locationUpdateState) {
             fusedLocationClient.removeLocationUpdates(locationCallback)
             locationUpdateState = false
