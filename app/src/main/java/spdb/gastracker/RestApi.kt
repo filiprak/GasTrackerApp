@@ -6,7 +6,9 @@ import com.github.kittinunf.fuel.android.extension.responseJson
 import com.github.kittinunf.fuel.core.FuelError
 import com.github.kittinunf.fuel.core.FuelManager
 import com.github.kittinunf.fuel.httpGet
+import com.github.kittinunf.fuel.httpPost
 import com.google.android.gms.maps.model.LatLng
+import com.google.gson.Gson
 
 
 class RestApi {
@@ -122,6 +124,34 @@ class RestApi {
             } else {
                 // error
                 Log.e("gastracker", "RestApi.updatePrice(ERR): ${err}")
+                error(err)
+            }
+        })
+    }
+
+    /** GET /route_stations?maxdist=? */
+    fun routeStations(route: MutableList<LatLng>, maxdist: Double, resolve: (data: Json?) -> Any, error: (error: FuelError) -> Any) {
+        var params = listOf<Pair<String, Any>>("maxdist" to maxdist)
+
+        var routeattr = arrayListOf<Array<Double>>()
+        route.forEach { latLng: LatLng? ->
+            if (latLng != null) {
+                routeattr.add(arrayOf(latLng.latitude, latLng.longitude))
+            }
+        }
+
+        var body = mapOf("route" to routeattr)
+
+        "/route_stations".httpPost(params).body(Gson().toJson(body)).responseJson({ request, response, result ->
+            val (data, err) = result
+
+            if (err == null) {
+                // success
+                Log.i("gastracker", "RestApi.routeStations(OK): ${data.toString()}")
+                resolve(data)
+            } else {
+                // error
+                Log.e("gastracker", "RestApi.routeStations(ERR): ${err} Body: ${Gson().toJson(body)}")
                 error(err)
             }
         })

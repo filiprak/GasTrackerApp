@@ -15,6 +15,7 @@ import com.google.maps.DirectionsApi
 import com.google.maps.GeoApiContext
 import com.google.maps.model.DirectionsResult
 import com.google.maps.model.TravelMode
+import org.json.JSONArray
 import spdb.gastracker.MapsActivity
 import spdb.gastracker.R
 import spdb.gastracker.RestApi
@@ -61,10 +62,21 @@ class NewRouteTask(override var activity: MapsActivity, override var mMap: Googl
                                 if (result != null) {
                                     // draw route
                                     activity.runOnUiThread {
+                                        mMap.clear()
                                         drawRoute(result)
                                         val llbuilder = LatLngBounds.Builder()
                                         var empty = true
+
                                         routePolyline.forEach { polyline: Polyline ->
+                                            activity.loader("on")
+                                            rest.routeStations(polyline.points, 5000.0, {data ->
+                                                if (data != null) drawStations(data.array())
+                                                else activity.snackbar(message = "Unknown error, no data provided in response")
+                                                activity.loader("off")
+                                            }, {e ->
+                                                activity.snackbar(message = e.message)
+                                                activity.loader("off")
+                                            })
                                             polyline.points.forEach { latLng: LatLng? ->
                                                 if (latLng != null) llbuilder.include(latLng)
                                                 empty = false
@@ -76,7 +88,6 @@ class NewRouteTask(override var activity: MapsActivity, override var mMap: Googl
                                     }
                                 }
                             }
-
                         })
 
                 Log.i("gastracker", "Route: origin: ${routeOrigin?.address}, dest: ${routeDest?.address}")
@@ -147,6 +158,23 @@ class NewRouteTask(override var activity: MapsActivity, override var mMap: Googl
             routePolyline.add(mMap.addPolyline(popts))
         } catch (e: Exception) {
             activity.snackbar(message="Cannot draw route: missing data")
+        }
+    }
+
+    fun drawStations(stations: JSONArray) {
+        for (i in 0..(stations.length() - 1)) {
+            val s = stations.getJSONObject(i)
+            val coords = LatLng(s.optDouble("lat"), s.optDouble("lng"))
+            val station_id = s["station_id"] as Int
+            val network_id = s["network_id"] as Int
+            val nname = activity.gasNetworks.get(network_id)
+            s.put("network_name", if(nname == null) "None" else nname.network_name)
+
+            val m = mMap.addMarker(MarkerOptions()
+                    .position(coords))
+            m.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.marker_route))
+            m.tag = s
+            routeMarkers.add(m)
         }
     }
 
