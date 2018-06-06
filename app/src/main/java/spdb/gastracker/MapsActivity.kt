@@ -189,8 +189,8 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             true
         }
 
-        R.id.action_settings -> {
-
+        R.id.action_fuelType -> {
+            cheapestClosestTask.openFuelDialog()
             true
         }
 
@@ -273,6 +273,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         // init tasks
         cheapestClosestTask = CheapestClosestTask(this@MapsActivity, mMap, rest)
         cheapestClosestTask.prepare()
+        cheapestClosestTask.openFuelDialog()
         newRouteTask = NewRouteTask(this@MapsActivity, mMap, rest)
         newRouteTask.prepare()
         showClustersTask = ShowClustersTask(this@MapsActivity, mMap, rest)

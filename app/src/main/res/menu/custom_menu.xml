@@ -9,9 +9,10 @@
 
     <!-- Settings, should always be in the overflow -->
     <item
-        android:id="@+id/action_settings"
-        android:title="@string/action_settings"
-        app:showAsAction="never" />
+        android:id="@+id/action_fuelType"
+        android:title="@string/action_fuelType"
+        android:icon="@drawable/web_hi_res_512_round"
+        app:showAsAction="ifRoom" />
 
     <item
         android:id="@+id/action_stations"

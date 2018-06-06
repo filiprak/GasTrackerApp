@@ -22,4 +22,5 @@
     <string name="action_route">New route</string>
     <string name="action_clear">Clear map</string>
     <string name="auto_location">Auto location</string>
+    <string name="action_fuelType">Fuel type</string>
 </resources>

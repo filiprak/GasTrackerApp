@@ -1,7 +1,11 @@
 package spdb.gastracker.tasks
 
+import android.app.AlertDialog
+import android.app.Dialog
 import android.content.Context
-import android.widget.Toast
+import android.util.Log
+import android.view.View
+import android.widget.*
 import com.google.android.gms.maps.CameraUpdateFactory
 import spdb.gastracker.RestApi
 import spdb.gastracker.utils.GasTrackerTask
@@ -9,24 +13,51 @@ import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.model.*
 import spdb.gastracker.MapsActivity
 import spdb.gastracker.R
+import spdb.gastracker.utils.DialogForm
+import java.util.function.Consumer
 
 /**
  * Created by raqu on 6/5/18.
  */
 class CheapestClosestTask(override var activity: MapsActivity, override var mMap: GoogleMap, override var rest: RestApi) : GasTrackerTask {
 
-    var fuel: String = "LPG"
+    var fuelType = "PB95"
     var stationMarkers: MutableList<Marker> = mutableListOf()
-
+    lateinit var fuelTypeDialog: DialogForm
+    var previousHashCheap: Int = 0
+    var previousHashClose: Int = 0
+    var isFirst: Boolean = true
 
     override fun prepare(p0: Any?, p1: Any?, p2: Any?) {
 
+        fuelTypeDialog = object : DialogForm(activity, R.layout.fuel_type, "Select fuel type", mapOf(
+                "PB95" to R.id.pb95_check,
+                "ON" to R.id.on_check,
+                "LPG" to R.id.lpg_check
+        )) {
+            override fun success(data: Map<String, Any>) {
+                Log.i("fuelType", "Success")
+                val radioGroup = dialogView.findViewById<RadioGroup>(R.id.fuel_radio)
+                val checkedID = radioGroup.checkedRadioButtonId
+                val radioView = radioGroup.findViewById<View>(checkedID)
+                val radio = radioGroup.getChildAt(radioGroup.indexOfChild(radioView)) as RadioButton
+                fuelType = radio.text.toString()
+            }
+
+            override fun initialise(builder: AlertDialog.Builder, view: View, schema: Map<String, Int>) {
+
+            }
+        }
     }
+
+    public fun openFuelDialog() {
+        fuelTypeDialog.open(emptyMap())
+    }
+
 
     override fun start(p0: Any?, p1: Any?, p2: Any?) {
         val currentLocation: LatLng = p0 as LatLng
 
-        mMap.clear()
         val llbuilder = LatLngBounds.Builder()
 
         activity.mOptionsMenu!!.findItem(R.id.action_clusters).isChecked = false
@@ -35,44 +66,68 @@ class CheapestClosestTask(override var activity: MapsActivity, override var mMap
         try {
             // loader("on")
 
-            llbuilder.include(currentLocation)
-
-            rest.getClusterStations(currentLocation, fuel, { data ->
+            rest.getClusterStations(currentLocation, fuelType, { data ->
                 if (data != null) {
                     val stations = data.obj()
                     val cheapestStations = stations.getJSONArray("cheapest_stations")
+                    val closestStation = stations.getJSONObject("closest_station")
 
-                    for (i in 0..(cheapestStations.length() - 1)) {
-                        val station = cheapestStations.getJSONObject(i)
-                        val coords = LatLng(station["lat"] as Double, station["lng"] as Double)
-                        val station_id = station["station_id"] as Int
-                        val network_id = station["network_id"] as Int
-                        val nname = activity.gasNetworks.get(network_id)
-                        station.put("network_name", if(nname == null) "None" else nname.network_name)
+                    if (previousHashCheap != cheapestStations.toString().hashCode()) {
+                        mMap.clear()
+                        previousHashCheap = cheapestStations.toString().hashCode()
+                        Log.i("Hash", previousHashCheap.toString())
 
-                        llbuilder.include(coords)
-                        val m = mMap.addMarker(MarkerOptions().position(coords))
-                        m.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.marker_green))
-                        m.tag = station
-                        stationMarkers.add(m)
+                        var cheapMarker: Marker? = null
+                        if (isFirst == false)
+                            cheapMarker = stationMarkers.lastOrNull()
+
+                        stationMarkers.clear()
+
+
+                        for (i in 0..(cheapestStations.length() - 1)) {
+                            val station = cheapestStations.getJSONObject(i)
+                            val coords = LatLng(station["lat"] as Double, station["lng"] as Double)
+                            val station_id = station["station_id"] as Int
+                            val network_id = station["network_id"] as Int
+                            val nname = activity.gasNetworks.get(network_id)
+                            station.put("network_name", if (nname == null) "None" else nname.network_name)
+
+                            val m = mMap.addMarker(MarkerOptions().position(coords))
+                            m.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.marker_green))
+                            m.tag = station
+                            stationMarkers.add(m)
+                        }
+                        if (cheapMarker != null) stationMarkers.add(cheapMarker)
                     }
 
-                    val station = stations.getJSONObject("closest_station")
-                    val coords = LatLng(station["lat"] as Double, station["lng"] as Double)
-                    val station_id = station["station_id"] as Int
-                    val network_id = station["network_id"] as Int
-                    val nname = activity.gasNetworks.get(network_id)
-                    station.put("network_name", if(nname == null) "None" else nname.network_name)
+                        if (previousHashClose != closestStation.toString().hashCode()) {
 
-                    llbuilder.include(coords)
-                    val m = mMap.addMarker(MarkerOptions().position(coords))
-                    m.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.marker_red))
-                    m.tag = station
-                    stationMarkers.add(m)
-                    mMap.animateCamera(CameraUpdateFactory.newLatLngBounds(llbuilder.build(), 100))
+                            previousHashClose = closestStation.toString().hashCode()
+                            if (isFirst == false)
+                                stationMarkers.last().remove()
+                                stationMarkers.removeAt(stationMarkers.lastIndex)
+
+                            val coords = LatLng(closestStation["lat"] as Double, closestStation["lng"] as Double)
+                            val station_id = closestStation["station_id"] as Int
+                            val network_id = closestStation["network_id"] as Int
+                            val nname = activity.gasNetworks.get(network_id)
+                            closestStation.put("network_name", if (nname == null) "None" else nname.network_name)
+
+                            val m = mMap.addMarker(MarkerOptions().position(coords))
+                            m.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.marker_red))
+                            m.tag = closestStation
+                            stationMarkers.add(m)
+                        }
+                        isFirst = false
+                        stationMarkers.forEach { marker: Marker -> llbuilder.include(marker.position) }
+                        llbuilder.include(currentLocation)
+
+                        mMap.animateCamera(CameraUpdateFactory.newLatLngBounds(llbuilder.build(), 100))
+
+
                 }
 
-            }, { e -> activity.loader("off"); activity.snackbar(message=e.message) })
+            }, { e -> activity.loader("off"); activity.snackbar(message = e.message) })
 
         } catch (e: Exception) {
             activity.loader("off")
