@@ -11,6 +11,7 @@ import spdb.gastracker.RestApi
 import spdb.gastracker.utils.GasTrackerTask
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.model.*
+import com.google.gson.Gson
 import org.json.JSONArray
 import org.json.JSONObject
 import spdb.gastracker.MapsActivity
@@ -24,11 +25,11 @@ import java.util.function.Consumer
 class CheapestClosestTask(override var activity: MapsActivity, override var mMap: GoogleMap, override var rest: RestApi) : GasTrackerTask {
 
     var fuelType = "PB95"
-    var cheapStationsMarkers: MutableList<Marker> = mutableListOf()
-    var closeStationsMarkers: MutableList<Marker> = mutableListOf()
+    var markers = mutableMapOf<Long, Pair<Marker, SType>>()
     lateinit var fuelTypeDialog: DialogForm
-    var previousHashCheap: Int = 0
-    var previousHashClose: Int = 0
+
+    enum class SType { CLOSEST, CHEAPEST, SHARED }
+
 
     override fun prepare(p0: Any?, p1: Any?, p2: Any?) {
 
@@ -56,17 +57,104 @@ class CheapestClosestTask(override var activity: MapsActivity, override var mMap
         fuelTypeDialog.open(emptyMap())
     }
 
+    private fun updateMarkers(cheapest: JSONArray, closest: JSONArray) {
+        var swapMarkers = mutableMapOf<Long, Pair<Marker, SType>>()
+
+        val shared = sharedStations(cheapest, closest)
+
+        for (i in 0..(cheapest.length() - 1)) {
+            val station = cheapest.getJSONObject(i)
+            val coords = LatLng(station["lat"] as Double, station["lng"] as Double)
+            val station_id = station.optLong("station_id")
+            val network_id = station["network_id"] as Int
+            val updated = station.optLong("updated", 0)
+            val nname = activity.gasNetworks.get(network_id)
+            station.put("network_name", if (nname == null) "None" else nname.network_name)
+
+            var stype = if (shared.contains(station_id)) SType.SHARED else SType.CHEAPEST
+
+            // find exising station
+            val existing = markers.get(station_id)
+            if (existing == null
+                    || updated > (existing.first.tag as JSONObject).optLong("updated", 0)
+                    || existing.second != stype) {
+                //replace marker
+                val m = mMap.addMarker(MarkerOptions().position(coords))
+                val iconid = if(stype == SType.SHARED) R.drawable.marker_shared else R.drawable.marker_green
+                m.setIcon(BitmapDescriptorFactory.fromResource(iconid))
+                m.tag = station
+
+                // remove old marker if changed
+                if (existing != null) existing.first.remove()
+                swapMarkers.set(station_id, Pair(m, stype))
+            } else {
+                swapMarkers.set(station_id, existing)
+            }
+        }
+
+        for (i in 0..(closest.length() - 1)) {
+            val station = closest.getJSONObject(i)
+            val coords = LatLng(station["lat"] as Double, station["lng"] as Double)
+            val station_id = station.optLong("station_id")
+            val network_id = station["network_id"] as Int
+            val updated = station.optLong("updated", 0)
+            val nname = activity.gasNetworks.get(network_id)
+            station.put("network_name", if (nname == null) "None" else nname.network_name)
+
+            var stype = if (shared.contains(station_id)) SType.SHARED else SType.CLOSEST
+
+            // avoid duplicating shared markers
+            if (stype == SType.SHARED) continue
+
+            // find exising station
+            val existing = markers.get(station_id)
+            if (existing == null || updated > (existing.first.tag as JSONObject).optLong("updated", 0) || existing.second != stype) {
+                //replace marker
+                val m = mMap.addMarker(MarkerOptions().position(coords))
+                val iconid = if(stype == SType.SHARED) R.drawable.marker_shared else R.drawable.marker_red
+                m.setIcon(BitmapDescriptorFactory.fromResource(iconid))
+                m.tag = station
+
+                // remove old marker if changed
+                if (existing != null) existing.first.remove()
+                swapMarkers.set(station_id, Pair(m, stype))
+            } else {
+                swapMarkers.set(station_id, existing)
+            }
+        }
+
+        Log.i("markers", "markers____: ${Gson().toJson(markers.keys)}")
+        Log.i("markers", "swapMarkers: ${Gson().toJson(swapMarkers.keys)}")
+
+        for ((id, pair) in markers) {
+            if (swapMarkers.get(id) == null) pair.first.remove()
+        }
+
+        markers = swapMarkers
+    }
+
+    private fun sharedStations(a: JSONArray, b: JSONArray): MutableList<Long> {
+        val result: MutableList<Long> = mutableListOf()
+        val aids: MutableList<Long> = mutableListOf()
+
+        for (i in 0..a.length() - 1) {
+            val station = a.optJSONObject(i)
+            aids.add(i, station.optLong("station_id"))
+        }
+        for (i in 0..b.length() - 1) {
+            val station = b.optJSONObject(i)
+            val id = station.optLong("station_id")
+            if (aids.contains(id)) result.add(id)
+        }
+        return result
+    }
 
     override fun start(p0: Any?, p1: Any?, p2: Any?) {
         val currentLocation: LatLng = p0 as LatLng
 
-        val llbuilder = LatLngBounds.Builder()
-
         activity.mOptionsMenu!!.findItem(R.id.action_clusters).isChecked = false
-        //activity.startLocationUpdates()
 
         try {
-            // loader("on")
 
             rest.getClusterStations(currentLocation, fuelType, { data ->
                 if (data != null) {
@@ -74,80 +162,27 @@ class CheapestClosestTask(override var activity: MapsActivity, override var mMap
                     val cheapestStations = stations.getJSONArray("cheapest_stations")
                     val closestStations = stations.getJSONArray("closest_stations")
 
-                    if (previousHashCheap != cheapestStations.toString().hashCode()) {
-                        mMap.clear()
-                        previousHashCheap = cheapestStations.toString().hashCode()
-                        Log.i("Hash", previousHashCheap.toString())
+                    updateMarkers(cheapestStations, closestStations)
 
-                        cheapStationsMarkers.clear()
-
-
-                        for (i in 0..(cheapestStations.length() - 1)) {
-                            val station = cheapestStations.getJSONObject(i)
-                            val coords = LatLng(station["lat"] as Double, station["lng"] as Double)
-                            val station_id = station["station_id"] as Int
-                            val network_id = station["network_id"] as Int
-                            val nname = activity.gasNetworks.get(network_id)
-                            station.put("network_name", if (nname == null) "None" else nname.network_name)
-
-                            val m = mMap.addMarker(MarkerOptions().position(coords))
-                            m.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.marker_green))
-                            m.tag = station
-
-                            cheapStationsMarkers.add(m)
-                        }
+                    val llbuilder = LatLngBounds.Builder()
+                    for ((id, pair) in markers) {
+                        llbuilder.include(pair.first.position)
                     }
-
-
-                    if (previousHashClose != closestStations.toString().hashCode()) {
-
-                        previousHashClose = closestStations.toString().hashCode()
-
-                        closeStationsMarkers.forEach { marker: Marker -> marker.remove() }
-
-                        closeStationsMarkers.clear()
-
-                        for (i in 0..(closestStations.length() - 1)) {
-
-
-                            val closestStation = closestStations.getJSONObject(i)
-                            val coords = LatLng(closestStation["lat"] as Double, closestStation["lng"] as Double)
-                            val station_id = closestStation["station_id"] as Int
-                            val network_id = closestStation["network_id"] as Int
-                            val nname = activity.gasNetworks.get(network_id)
-                            closestStation.put("network_name", if (nname == null) "None" else nname.network_name)
-
-                            val m = mMap.addMarker(MarkerOptions().position(coords))
-                            m.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.marker_red))
-                            m.tag = closestStation
-                            closeStationsMarkers.add(m)
-                        }
-                    }
-                    cheapStationsMarkers.forEach { marker: Marker -> llbuilder.include(marker.position) }
-                    closeStationsMarkers.forEach { marker: Marker -> llbuilder.include(marker.position) }
                     llbuilder.include(currentLocation)
 
+                    mMap.animateCamera(CameraUpdateFactory.newLatLngBounds(llbuilder.build(), 200))
 
-                    mMap.animateCamera(CameraUpdateFactory.newLatLngBounds(llbuilder.build(), 100))
+                } else activity.snackbar(message = "No data provided in network response")
 
-
-                }
-
-            }, { e -> activity.loader("off"); activity.snackbar(message = e.message) })
+            }, { e -> activity.snackbar(message = e.message) })
 
         } catch (e: Exception) {
-            activity.loader("off")
             activity.snackbar(type = "error", message = e.message)
         }
     }
 
     override fun clean(p0: Any?) {
         TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
-    }
-
-    public fun reset() {
-        previousHashClose = 0
-        previousHashCheap = 0
     }
 
 }
