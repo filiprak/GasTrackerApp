@@ -178,6 +178,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                 stopLocationUpdates()
                 item.isChecked = false
             } else if (!item.isChecked) {
+                cheapestClosestTask.reset()
                 startLocationUpdates()
                 item.isChecked = true
             }
@@ -293,7 +294,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             }
         }
         createLocationRequest()
-        startLocationUpdates()
+        //startLocationUpdates()
 
         if (mOptionsMenu != null && mOptionsMenu!!.findItem(R.id.action_clusters).isChecked)
             showStationsTask.start()
@@ -388,7 +389,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         locationRequest = LocationRequest()
         locationRequest.interval = 10000
         locationRequest.fastestInterval = 5000
-        locationRequest.priority = LocationRequest.PRIORITY_HIGH_ACCURACY
+        locationRequest.priority = LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY
 
         var builder = LocationSettingsRequest.Builder().addLocationRequest(locationRequest)
         val client = LocationServices.getSettingsClient(this)

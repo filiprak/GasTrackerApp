@@ -11,6 +11,8 @@ import spdb.gastracker.RestApi
 import spdb.gastracker.utils.GasTrackerTask
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.model.*
+import org.json.JSONArray
+import org.json.JSONObject
 import spdb.gastracker.MapsActivity
 import spdb.gastracker.R
 import spdb.gastracker.utils.DialogForm
@@ -62,7 +64,7 @@ class CheapestClosestTask(override var activity: MapsActivity, override var mMap
         val llbuilder = LatLngBounds.Builder()
 
         activity.mOptionsMenu!!.findItem(R.id.action_clusters).isChecked = false
-        activity.startLocationUpdates()
+        //activity.startLocationUpdates()
 
         try {
             // loader("on")
@@ -101,6 +103,7 @@ class CheapestClosestTask(override var activity: MapsActivity, override var mMap
                     }
                         if (previousHashClose != closestStations.toString().hashCode()) {
 
+<<<<<<< HEAD
                             previousHashClose = closestStations.toString().hashCode()
                             if (isFirst == false) {
                                 closestMarkers.forEach { marker: Marker -> marker.remove() }
@@ -124,8 +127,32 @@ class CheapestClosestTask(override var activity: MapsActivity, override var mMap
                         isFirst = false
                         closestMarkers.forEach { marker: Marker -> llbuilder.include(marker.position) }
                         llbuilder.include(currentLocation)
+=======
+                    if (previousHashClose != closestStation.toString().hashCode()) {
 
-                        mMap.animateCamera(CameraUpdateFactory.newLatLngBounds(llbuilder.build(), 100))
+                        previousHashClose = closestStation.toString().hashCode()
+                        if (isFirst == false) {
+                            stationMarkers.last().remove()
+                            stationMarkers.removeAt(stationMarkers.lastIndex)
+                        }
+
+                        val coords = LatLng(closestStation["lat"] as Double, closestStation["lng"] as Double)
+                        val station_id = closestStation["station_id"] as Int
+                        val network_id = closestStation["network_id"] as Int
+                        val nname = activity.gasNetworks.get(network_id)
+                        closestStation.put("network_name", if (nname == null) "None" else nname.network_name)
+
+                        val m = mMap.addMarker(MarkerOptions().position(coords))
+                        m.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.marker_red))
+                        m.tag = closestStation
+                        stationMarkers.add(m)
+                    }
+                    isFirst = false
+                    stationMarkers.forEach { marker: Marker -> llbuilder.include(marker.position) }
+                    llbuilder.include(currentLocation)
+>>>>>>> cluster stations change
+
+                    mMap.animateCamera(CameraUpdateFactory.newLatLngBounds(llbuilder.build(), 100))
 
 
                 }
@@ -140,6 +167,12 @@ class CheapestClosestTask(override var activity: MapsActivity, override var mMap
 
     override fun clean(p0: Any?) {
         TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+    }
+
+    public fun reset() {
+        previousHashClose = 0
+        previousHashCheap = 0
+        isFirst = true
     }
 
 }
