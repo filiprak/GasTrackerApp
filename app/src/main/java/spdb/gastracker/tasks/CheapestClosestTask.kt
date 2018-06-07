@@ -22,7 +22,8 @@ import java.util.function.Consumer
 class CheapestClosestTask(override var activity: MapsActivity, override var mMap: GoogleMap, override var rest: RestApi) : GasTrackerTask {
 
     var fuelType = "PB95"
-    var stationMarkers: MutableList<Marker> = mutableListOf()
+    var cheapestMarkers: MutableList<Marker> = mutableListOf()
+    var closestMarkers: MutableList<Marker> = mutableListOf()
     lateinit var fuelTypeDialog: DialogForm
     var previousHashCheap: Int = 0
     var previousHashClose: Int = 0
@@ -79,10 +80,9 @@ class CheapestClosestTask(override var activity: MapsActivity, override var mMap
 
                         var cheapMarker: Marker? = null
                         if (isFirst == false)
-                            cheapMarker = stationMarkers.lastOrNull()
+                            cheapMarker = cheapestMarkers.lastOrNull()
 
-                        stationMarkers.clear()
-
+                        cheapestMarkers.clear()
 
                         for (i in 0..(cheapestStations.length() - 1)) {
                             val station = cheapestStations.getJSONObject(i)
@@ -95,16 +95,17 @@ class CheapestClosestTask(override var activity: MapsActivity, override var mMap
                             val m = mMap.addMarker(MarkerOptions().position(coords))
                             m.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.marker_green))
                             m.tag = station
-                            stationMarkers.add(m)
+                            cheapestMarkers.add(m)
                         }
-                        if (cheapMarker != null) stationMarkers.add(cheapMarker)
+                        if (cheapMarker != null) cheapestMarkers.add(cheapMarker)
                     }
                         if (previousHashClose != closestStations.toString().hashCode()) {
 
                             previousHashClose = closestStations.toString().hashCode()
-                            if (isFirst == false)
-                                stationMarkers.last().remove()
-                                stationMarkers.removeAt(stationMarkers.lastIndex)
+                            if (isFirst == false) {
+                                closestMarkers.forEach { marker: Marker -> marker.remove() }
+                                closestMarkers.clear()
+                            }
 
                             for (i in 0..(closestStations.length() - 1)) {
                                 val closestStation = closestStations.getJSONObject(i)
@@ -117,11 +118,11 @@ class CheapestClosestTask(override var activity: MapsActivity, override var mMap
                                 val m = mMap.addMarker(MarkerOptions().position(coords))
                                 m.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.marker_red))
                                 m.tag = closestStation
-                                stationMarkers.add(m)
+                                closestMarkers.add(m)
                             }
                         }
                         isFirst = false
-                        stationMarkers.forEach { marker: Marker -> llbuilder.include(marker.position) }
+                        closestMarkers.forEach { marker: Marker -> llbuilder.include(marker.position) }
                         llbuilder.include(currentLocation)
 
                         mMap.animateCamera(CameraUpdateFactory.newLatLngBounds(llbuilder.build(), 100))
