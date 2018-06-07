@@ -23,7 +23,7 @@ class RestApi(ctx: Context) {
 
             if (err == null) {
                 // success
-                Log.i("restApi", "RestApi.getNetworks(OK): ${data.toString()}")
+                Log.i("restApi", "RestApi.getNetworks(OK): ${response.statusCode}")
                 resolve(data)
             } else {
                 // error
@@ -42,7 +42,7 @@ class RestApi(ctx: Context) {
 
             if (err == null) {
                 // success
-                Log.i("restApi", "RestApi.getClusterStations(OK): ${data.toString()}")
+                Log.i("restApi", "RestApi.getClusterStations(OK): ${response.statusCode}")
                 resolve(data)
             } else {
                 // error
@@ -60,7 +60,7 @@ class RestApi(ctx: Context) {
 
             if (err == null) {
                 // success
-                Log.i("gastracker", "RestApi.getStation(OK): ${data.toString()}")
+                Log.i("gastracker", "RestApi.getStation(OK): ${response.statusCode}")
                 resolve(data)
             } else {
                 // error
@@ -79,7 +79,7 @@ class RestApi(ctx: Context) {
 
             if (err == null) {
                 // success
-                Log.i("gastracker", "RestApi.getStationsFromRadius(OK): ${data.toString()}")
+                Log.i("gastracker", "RestApi.getStationsFromRadius(OK): ${response.statusCode}")
                 resolve(data)
             } else {
                 // error
@@ -99,7 +99,7 @@ class RestApi(ctx: Context) {
 
             if (err == null) {
                 // success
-                Log.i("gastracker", "RestApi.getClusters(OK): ${data.toString()}")
+                Log.i("gastracker", "RestApi.getClusters(OK): ${response.statusCode}")
                 resolve(data)
             } else {
                 // error
@@ -119,7 +119,7 @@ class RestApi(ctx: Context) {
 
             if (err == null) {
                 // success
-                Log.i("gastracker", "RestApi.updatePrice(OK): ${data.toString()}")
+                Log.i("gastracker", "RestApi.updatePrice(OK): ${response.statusCode}")
                 resolve(data)
             } else {
                 // error
@@ -131,7 +131,6 @@ class RestApi(ctx: Context) {
 
     /** GET /route_stations?maxdist=? */
     fun routeStations(route: MutableList<LatLng>, maxdist: Double, resolve: (data: Json?) -> Any, error: (error: FuelError) -> Any) {
-        var params = listOf<Pair<String, Any>>("maxdist" to maxdist)
 
         var routeattr = arrayListOf<Array<Double>>()
         route.forEach { latLng: LatLng? ->
@@ -142,14 +141,12 @@ class RestApi(ctx: Context) {
 
         var body = mapOf("route" to routeattr)
 
-        "/route_stations".httpPost(params).body(Gson().toJson(body)).responseJson({ request, response, result ->
+        "/route_stations?maxdist=${maxdist}".httpPost().body(Gson().toJson(body)).responseJson({ request, response, result ->
             val (data, err) = result
-
-            Log.i("gastracker", "RestApi.routeStations(request): ${request.parameters}")
 
             if (err == null) {
                 // success
-                Log.i("gastracker", "RestApi.routeStations(OK): ${data.toString()}")
+                Log.i("gastracker", "RestApi.routeStations(OK): ${response.statusCode}")
                 resolve(data)
             } else {
                 // error
