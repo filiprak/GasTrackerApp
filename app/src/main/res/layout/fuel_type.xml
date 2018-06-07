@@ -1,35 +1,71 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
-    android:layout_width="wrap_content"
-    android:layout_height="wrap_content">
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
 
-    <RadioGroup
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:id="@+id/fuel_radio"
-        android:padding="20dp"
-        >
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:padding="20dp">
 
-        <RadioButton
+        <RadioGroup
+            android:id="@+id/fuel_radio"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:id="@+id/pb95_check"
-            android:text="PB95"
-            android:checked="true"
-            />
+            android:paddingBottom="20dp">
 
-        <RadioButton
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:id="@+id/on_check"
-            android:text="ON" />
+            <RadioButton
+                android:id="@+id/pb95_check"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checked="true"
+                android:text="PB95" />
 
-        <RadioButton
-            android:layout_width="wrap_content"
+            <RadioButton
+                android:id="@+id/on_check"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="ON" />
+
+            <RadioButton
+                android:id="@+id/lpg_check"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="LPG" />
+
+        </RadioGroup>
+
+        <TextView
+            android:id="@+id/cheaplabel"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:id="@+id/lpg_check"
-            android:text="LPG" />
-    </RadioGroup>
+            android:layout_weight="1"
+            android:text="Number of cheapest stations to display" />
+
+        <EditText
+            android:id="@+id/cheapest"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ems="10"
+            android:inputType="number"
+            android:text="3" />
+
+        <TextView
+            android:id="@+id/closelabel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Number of closest stations to display" />
+
+        <EditText
+            android:id="@+id/closest"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ems="10"
+            android:inputType="number"
+            android:text="1" />
+    </LinearLayout>
 
 </ScrollView>

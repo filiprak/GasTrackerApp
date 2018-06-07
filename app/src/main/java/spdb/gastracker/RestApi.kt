@@ -35,18 +35,18 @@ class RestApi(ctx: Context) {
 
     /** GET /cluster_stations?lat=x&lng=y&fuel=z
      * cheapest stations and closest in cluster*/
-    fun getClusterStations(position: LatLng, fuel: String, resolve: (data: Json?) -> Any, error: (error: FuelError) -> Any) {
-        Log.i("restApi", "pobieram stacje z klastra")
-        "/cluster_stations".httpGet(listOf("lat" to position.latitude, "lng" to position.longitude, "fuel" to fuel)).responseJson({ request, response, result ->
+    fun getClusterStations(position: LatLng, fuel: String, config: List<Pair<String, Any?>>, resolve: (data: Json?) -> Any, error: (error: FuelError) -> Any) {
+
+        "/cluster_stations".httpGet(mutableListOf("lat" to position.latitude, "lng" to position.longitude, "fuel" to fuel) + config).responseJson({ request, response, result ->
             val (data, err) = result
 
             if (err == null) {
                 // success
-                Log.i("restApi", "RestApi.getClusterStations(OK): ${response.statusCode}")
+                Log.i("restApi", "RestApi.getClusterStations(OK): ${response.statusCode} ${request.url}")
                 resolve(data)
             } else {
                 // error
-                Log.e("restApi", "RestApi.getClusterStations(ERR): ${err}")
+                Log.e("restApi", "RestApi.getClusterStations(ERR): ${err} ${response}")
                 error(err)
             }
         })

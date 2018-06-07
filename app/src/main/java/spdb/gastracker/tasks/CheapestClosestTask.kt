@@ -25,6 +25,7 @@ import java.util.function.Consumer
 class CheapestClosestTask(override var activity: MapsActivity, override var mMap: GoogleMap, override var rest: RestApi) : GasTrackerTask {
 
     var fuelType = "PB95"
+    var config = listOf<Pair<String, Any>>("cheapN" to 3, "closeN" to 1)
     var markers = mutableMapOf<Long, Pair<Marker, SType>>()
     lateinit var fuelTypeDialog: DialogForm
 
@@ -45,6 +46,11 @@ class CheapestClosestTask(override var activity: MapsActivity, override var mMap
                 val radioView = radioGroup.findViewById<View>(checkedID)
                 val radio = radioGroup.getChildAt(radioGroup.indexOfChild(radioView)) as RadioButton
                 fuelType = radio.text.toString()
+
+                config = listOf<Pair<String, Any>>(
+                        "cheapN" to dialogView.findViewById<EditText>(R.id.cheapest).text.toString().toInt(),
+                        "closeN" to dialogView.findViewById<EditText>(R.id.closest).text.toString().toInt()
+                )
             }
 
             override fun initialise(builder: AlertDialog.Builder, view: View, schema: Map<String, Int>) {
@@ -156,7 +162,7 @@ class CheapestClosestTask(override var activity: MapsActivity, override var mMap
 
         try {
 
-            rest.getClusterStations(currentLocation, fuelType, { data ->
+            rest.getClusterStations(currentLocation, fuelType, config, { data ->
                 if (data != null) {
                     val stations = data.obj()
                     val cheapestStations = stations.getJSONArray("cheapest_stations")

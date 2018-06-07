@@ -178,7 +178,6 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                 stopLocationUpdates()
                 item.isChecked = false
             } else if (!item.isChecked) {
-                cheapestClosestTask.reset()
                 startLocationUpdates()
                 item.isChecked = true
             }
