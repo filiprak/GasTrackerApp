@@ -38,5 +38,22 @@
             android:layout_height="match_parent"
             android:layout_weight="1" />
 
+        <TextView
+            android:id="@+id/maxdistLabel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:layout_weight="1"
+            android:text="Maximum distance to search stations (m):" />
+
+        <EditText
+            android:id="@+id/maxdist"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ems="10"
+            android:inputType="numberDecimal"
+            android:text="500.0" />
+
     </LinearLayout>
 </ScrollView>

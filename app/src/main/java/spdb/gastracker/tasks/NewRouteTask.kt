@@ -4,6 +4,7 @@ import android.app.AlertDialog
 import android.support.v4.content.res.ResourcesCompat
 import android.util.Log
 import android.view.View
+import android.widget.EditText
 import com.google.android.gms.common.api.Status
 import com.google.android.gms.location.places.Place
 import com.google.android.gms.location.places.ui.PlaceAutocompleteFragment
@@ -44,6 +45,11 @@ class NewRouteTask(override var activity: MapsActivity, override var mMap: Googl
                     return
                 }
 
+                var maxdist = 500.0 // default max distance
+                val md = dialogView.findViewById<EditText>(R.id.maxdist).text.toString().toDouble()
+                if (md > 0.0 && md < 100000.0) maxdist = md
+                else activity.snackbar(message = "Invalid max distance parameter: must be from range 0 - 100km (default ${maxdist}m will be used)")
+
                 activity.loader("on")
                 if (geoApiContext == null) geoApiContext = createGeoApiContext()
                 DirectionsApi.newRequest(geoApiContext)
@@ -69,7 +75,7 @@ class NewRouteTask(override var activity: MapsActivity, override var mMap: Googl
 
                                         routePolyline.forEach { polyline: Polyline ->
                                             activity.loader("on")
-                                            rest.routeStations(polyline.points, 5000.0, {data ->
+                                            rest.routeStations(polyline.points, maxdist, {data ->
                                                 if (data != null) drawStations(data.array())
                                                 else activity.snackbar(message = "Unknown error, no data provided in response")
                                                 activity.loader("off")

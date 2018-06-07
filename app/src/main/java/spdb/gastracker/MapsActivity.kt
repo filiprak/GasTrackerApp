@@ -106,7 +106,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
 
         // init rest api instance
-        rest = RestApi()
+        rest = RestApi(this@MapsActivity)
 
         // fetch networks
         rest.getNetworks({ data ->

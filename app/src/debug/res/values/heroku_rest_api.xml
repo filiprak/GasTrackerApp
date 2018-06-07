@@ -1,0 +1,11 @@
+<resources>
+    <string
+        name="heroku_rest_api_url"
+        templateMergeStrategy="preserve"
+        translatable="false">
+
+        <!--Rest api base server endpoint-->
+        https://gas-tracker-app.herokuapp.com
+
+    </string>
+</resources>

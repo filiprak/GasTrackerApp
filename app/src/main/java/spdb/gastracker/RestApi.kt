@@ -1,5 +1,7 @@
 package spdb.gastracker
 
+import android.app.Activity
+import android.content.Context
 import android.util.Log
 import com.github.kittinunf.fuel.android.core.Json
 import com.github.kittinunf.fuel.android.extension.responseJson
@@ -11,9 +13,7 @@ import com.google.android.gms.maps.model.LatLng
 import com.google.gson.Gson
 
 
-class RestApi {
-
-    val serverBaseUrl = "https://gas-tracker-app.herokuapp.com"
+class RestApi(ctx: Context) {
 
     /** GET all networks*/
     fun getNetworks(resolve: (data: Json?) -> Any, error: (error: FuelError) -> Any) {
@@ -145,6 +145,8 @@ class RestApi {
         "/route_stations".httpPost(params).body(Gson().toJson(body)).responseJson({ request, response, result ->
             val (data, err) = result
 
+            Log.i("gastracker", "RestApi.routeStations(request): ${request.parameters}")
+
             if (err == null) {
                 // success
                 Log.i("gastracker", "RestApi.routeStations(OK): ${data.toString()}")
@@ -158,6 +160,6 @@ class RestApi {
     }
 
     init {
-        FuelManager.instance.basePath = serverBaseUrl
+        FuelManager.instance.basePath = ctx.resources.getString(R.string.heroku_rest_api_url)
     }
 }
